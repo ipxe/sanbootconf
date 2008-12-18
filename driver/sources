@@ -1,0 +1,11 @@
+TARGETNAME = iscsiboot
+
+TARGETTYPE = DRIVER
+
+TARGETPATH = ..\bin
+
+TARGETLIBS = $(DDK_LIB_PATH)\ndis.lib $(DDK_LIB_PATH)\ntstrsafe.lib $(DDK_LIB_PATH)\wdmsec.lib
+
+MSC_WARNING_LEVEL = /W4 /Wp64 /WX
+
+SOURCES = iscsiboot.c

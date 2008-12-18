@@ -1,0 +1,46 @@
+[Version]
+Signature = "$Windows NT$"
+Class = System
+ClassGUID = {4d36e97d-e325-11ce-bfc1-08002be10318}
+Provider = %fensys%
+CatalogFile = iscsiboot.cat
+DriverVer = 12/01/2008,0.1
+
+[Manufacturer]
+%fensys% = FenSystems
+
+[FenSystems]
+%iscsiboot% = iscsiboot,ROOT\iscsiboot
+
+[SourceDisksNames]
+0 = %srcdisk%
+
+[SourceDisksFiles.x86]
+iscsiboot.sys=0,\i386
+
+[SourceDisksFiles.amd64]
+iscsiboot.sys=0,\amd64
+
+[DestinationDirs]
+Files.Driver = 12
+
+[Files.Driver]
+iscsiboot.sys
+
+[iscsiboot]
+CopyFiles = Files.Driver
+
+[iscsiboot.Services]
+AddService = iscsiboot,0x00000002,Service
+
+[Service]
+ServiceType = 0x1
+StartType = 0x0
+LoadOrderGroup = Base
+ErrorControl = 0x1
+ServiceBinary = %12%\iscsiboot.sys
+
+[Strings]
+fensys = "Fen Systems Ltd."
+iscsiboot = "iSCSI Boot Driver"
+srcdisk = "Installation media"

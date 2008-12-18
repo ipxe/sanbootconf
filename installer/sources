@@ -1,0 +1,19 @@
+TARGETNAME = setup
+
+TARGETTYPE = PROGRAM
+
+TARGETPATH = ..\bin
+
+TARGETLIBS = $(DDK_LIB_PATH)\setupapi.lib \
+	     $(DDK_LIB_PATH)\newdev.lib
+
+USE_MSVCRT = 1
+
+MSC_WARNING_LEVEL = /W4 /Wp64 /WX
+
+UMTYPE = console
+
+UMENTRY = tmain
+
+SOURCES = setup.c setupdi.c registry.c
+
