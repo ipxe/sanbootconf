@@ -18,6 +18,7 @@
 
 #pragma warning(disable:4201)  /* nameless struct/union warning */
 #pragma warning(disable:4214)  /* non-int bitfield warning */
+#pragma warning(disable:4327)  /* indirection alignment mismatch */
 
 #include <ntddk.h>
 #include <ntstrsafe.h>
