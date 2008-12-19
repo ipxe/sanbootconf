@@ -786,7 +786,7 @@ static NTSTATUS store_tcpip_parameters ( PIBFT_NIC nic,
 		goto err_reg_store;
 
 	/* Store subnet mask */
-	subnet_mask = ( 0xffffffffUL >> ( 32 - nic->subnet_mask_prefix ) );
+	subnet_mask = RtlUlongByteSwap ( 0xffffffffUL << ( 32 - nic->subnet_mask_prefix ) );
 	status = store_ipv4_parameter_multi_sz ( reg_key, L"SubnetMask",
 						 subnet_mask );
 	if ( ! NT_SUCCESS ( status ) )
