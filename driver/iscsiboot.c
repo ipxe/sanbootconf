@@ -1059,11 +1059,6 @@ static NTSTATUS iscsiboot_dummy_irp ( PDEVICE_OBJECT device, PIRP irp ) {
 }
 
 /**
- * Retrieve iSCSI boot parameters
- *
- * @v device		
-
-/**
  * IoControl IRP handler
  *
  * @v device		Device object
