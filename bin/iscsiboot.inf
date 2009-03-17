@@ -7,19 +7,25 @@ CatalogFile = iscsiboot.cat
 DriverVer = 12/01/2008,0.1
 
 [Manufacturer]
-%fensys% = FenSystems
+%fensys% = FenSystems,NTx86,NTamd64
 
-[FenSystems]
+[FenSystems.NTx86]
 %iscsiboot% = iscsiboot,ROOT\iscsiboot
 
-[SourceDisksNames]
-0 = %srcdisk%
+[FenSystems.NTamd64]
+%iscsiboot% = iscsiboot,ROOT\iscsiboot
 
-[SourceDisksFiles.x86]
-iscsiboot.sys=0,\i386
+[SourceDisksNames.NTx86]
+1 = %srcdisk%,,,\i386
 
-[SourceDisksFiles.amd64]
-iscsiboot.sys=0,\amd64
+[SourceDisksNames.NTamd64]
+2 = %srcdisk%,,,\amd64
+
+[SourceDisksFiles]
+iscsiboot.sys=1
+
+[SourceDisksFiles.NTamd64]
+iscsiboot.sys=2
 
 [DestinationDirs]
 Files.Driver = 12
