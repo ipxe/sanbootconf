@@ -408,7 +408,7 @@ LONG reg_query_dword ( HKEY key, LPCWSTR subkey_name, LPCWSTR value_name,
 	}
 
 	/* Copy dword data */
-	memcpy ( &dword, buffer, sizeof ( dword ) );
+	memcpy ( dword, buffer, sizeof ( *dword ) );
 
 	/* Success */
 	err = ERROR_SUCCESS;
