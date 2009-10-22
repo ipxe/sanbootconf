@@ -266,4 +266,6 @@ typedef struct _IBFT_TABLE {
 } IBFT_TABLE, *PIBFT_TABLE;
 #pragma pack()
 
+extern VOID parse_ibft ( PIBFT_TABLE ibft );
+
 #endif /* _IBFT_H */

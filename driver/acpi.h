@@ -36,4 +36,7 @@ typedef struct _ACPI_DESCRIPTION_HEADER {
 } ACPI_DESCRIPTION_HEADER, *PACPI_DESCRIPTION_HEADER;
 #pragma pack()
 
+extern NTSTATUS find_acpi_table ( PCHAR signature,
+				  PACPI_DESCRIPTION_HEADER *table_copy );
+
 #endif /* _ACPI_H */
