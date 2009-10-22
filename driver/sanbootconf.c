@@ -30,6 +30,18 @@
 #include <iscsicfg.h>
 #include "ibft.h"
 
+/** DbgPrintEx() wrapper
+ *
+ * For Vista and above, using DbgPrint() will cause debug messages to
+ * be hidden unless explicitly enabled.  We don't want this; it's hard
+ * enough already getting diagnostic reports from users.
+ */
+#if NTDDI_VERSION >= NTDDI_WINXP
+#undef DbgPrint
+#define DbgPrint(...) DbgPrintEx ( DPFLTR_IHVDRIVER_ID, \
+				   DPFLTR_ERROR_LEVEL, __VA_ARGS__ )
+#endif /* NTDDI_WINXP */
+
 /** Tag to use for memory allocation */
 #define SANBOOTCONF_POOL_TAG 'fcbs'
 
