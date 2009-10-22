@@ -22,11 +22,14 @@
 #include "sanbootconf.h"
 #include "acpi.h"
 #include "ibft.h"
+#include "sbft.h"
 
 /** Device private data */
 typedef struct _SANBOOTCONF_PRIV {
-	/* Copy of iBFT */
+	/* Copy of iBFT, if any */
 	PIBFT_TABLE ibft;
+	/* Copy of sBFT, if any */
+	PSBFT_TABLE sbft;
 } SANBOOTCONF_PRIV, *PSANBOOTCONF_PRIV;
 
 /** Unique GUID for IoCreateDeviceSecure() */
@@ -35,7 +38,13 @@ DEFINE_GUID ( GUID_SANBOOTCONF_CLASS, 0x8a2f8602, 0x8f0b, 0x4138,
 
 /** IoControl code to retrieve iBFT */
 #define IOCTL_SANBOOTCONF_IBFT \
-	CTL_CODE ( FILE_DEVICE_UNKNOWN, 1, METHOD_BUFFERED, FILE_READ_ACCESS )
+	CTL_CODE ( FILE_DEVICE_UNKNOWN, 0x0001, METHOD_BUFFERED, \
+		   FILE_READ_ACCESS )
+
+/** IoControl code to retrieve sBFT */
+#define IOCTL_SANBOOTCONF_SBFT \
+	CTL_CODE ( FILE_DEVICE_UNKNOWN, 0x0873, METHOD_BUFFERED, \
+		   FILE_READ_ACCESS )
 
 /** Device name */
 static const WCHAR sanbootconf_device_name[] = L"\\Device\\sanbootconf";
@@ -79,11 +88,29 @@ static NTSTATUS sanbootconf_iocontrol_irp ( PDEVICE_OBJECT device, PIRP irp ) {
 	switch ( irpsp->Parameters.DeviceIoControl.IoControlCode ) {
 	case IOCTL_SANBOOTCONF_IBFT:
 		DbgPrint ( "iBFT requested\n" );
-		if ( len > priv->ibft->acpi.length )
-			len = priv->ibft->acpi.length;
-		RtlCopyMemory ( irp->AssociatedIrp.SystemBuffer,
-				priv->ibft, len );
-		status = STATUS_SUCCESS;
+		if ( priv->ibft ) {
+			if ( len > priv->ibft->acpi.length )
+				len = priv->ibft->acpi.length;
+			RtlCopyMemory ( irp->AssociatedIrp.SystemBuffer,
+					priv->ibft, len );
+			status = STATUS_SUCCESS;
+		} else {
+			DbgPrint ( "No iBFT available!\n" );
+			status = STATUS_NO_SUCH_FILE;
+		}
+		break;
+	case IOCTL_SANBOOTCONF_SBFT:
+		DbgPrint ( "sBFT requested\n" );
+		if ( priv->sbft ) {
+			if ( len > priv->sbft->acpi.length )
+				len = priv->sbft->acpi.length;
+			RtlCopyMemory ( irp->AssociatedIrp.SystemBuffer,
+					priv->sbft, len );
+			status = STATUS_SUCCESS;
+		} else {
+			DbgPrint ( "No sbft available!\n" );
+			status = STATUS_NO_SUCH_FILE;
+		}
 		break;
 	default:
 		DbgPrint ( "Unrecognised IoControl %x\n",
@@ -108,12 +135,13 @@ static NTSTATUS create_sanbootconf_device ( PDRIVER_OBJECT driver,
 					    PDEVICE_OBJECT *device ) {
 	UNICODE_STRING u_device_name;
 	UNICODE_STRING u_device_symlink;
-	unsigned int i;
+	PSANBOOTCONF_PRIV priv;
+	ULONG i;
 	NTSTATUS status;
 
 	/* Create device */
 	RtlInitUnicodeString ( &u_device_name, sanbootconf_device_name );
-	status = IoCreateDeviceSecure ( driver, sizeof ( SANBOOTCONF_PRIV ),
+	status = IoCreateDeviceSecure ( driver, sizeof ( *priv ),
 					&u_device_name, FILE_DEVICE_UNKNOWN,
 					FILE_DEVICE_SECURE_OPEN, FALSE,
 					&SDDL_DEVOBJ_SYS_ALL_ADM_ALL,
@@ -123,6 +151,8 @@ static NTSTATUS create_sanbootconf_device ( PDRIVER_OBJECT driver,
 			   sanbootconf_device_name, status );
 		return status;
 	}
+	priv = (*device)->DeviceExtension;
+	RtlZeroMemory ( priv, sizeof ( *priv ) );
 	(*device)->Flags &= ~DO_DEVICE_INITIALIZING;
 
 	/* Create device symlinks */
@@ -180,6 +210,17 @@ NTSTATUS DriverEntry ( IN PDRIVER_OBJECT DriverObject,
 	} else {
 		/* Lack of an iBFT is not necessarily an error */
 		DbgPrint ( "No iBFT found\n" );
+		status = STATUS_SUCCESS;
+	}
+
+	/* Look for an sBFT */
+	status = find_acpi_table ( SBFT_SIG, &table );
+	if ( NT_SUCCESS ( status ) ) {
+		priv->sbft = ( ( PSBFT_TABLE ) table );
+		parse_sbft ( priv->sbft );
+	} else {
+		/* Lack of an sBFT is not necessarily an error */
+		DbgPrint ( "No sBFT found\n" );
 		status = STATUS_SUCCESS;
 	}
 
