@@ -90,7 +90,7 @@ static LONG fix_service_group_order ( void ) {
 	WCHAR sgo_key_name[] =
 		L"SYSTEM\\CurrentControlSet\\Control\\ServiceGroupOrder";
 	WCHAR sgo_value_name[] = L"List";
-	WCHAR sgo_backup_value_name[] = L"List.pre-iscsiboot";
+	WCHAR sgo_backup_value_name[] = L"List.pre-sanbootconf";
 	LPWSTR *sgo;
 	LONG err;
 
@@ -402,12 +402,12 @@ int __cdecl main ( int argc, char **argv ) {
 	CHAR inf_path[MAX_PATH];
 	CHAR *file_part;
 	WCHAR inf_path_w[MAX_PATH];
-	WCHAR hw_id[] = L"ROOT\\iscsiboot";
+	WCHAR hw_id[] = L"ROOT\\sanbootconf";
 	DWORD len;
 	CHAR key;
 
-	printf ( "iSCSI Boot Driver Installation\n" );
-	printf ( "==============================\n\n" );
+	printf ( "SAN Boot Configuration Driver Installation\n" );
+	printf ( "==========================================\n\n" );
 
 	/* Check for iSCSI initiator existence */
 	if ( service_exists ( L"iScsiPrt" ) != 0 ) {
@@ -428,7 +428,7 @@ int __cdecl main ( int argc, char **argv ) {
 	if ( file_part )
 		*file_part = 0;
 	_snprintf ( inf_rel_path, sizeof ( inf_rel_path ),
-		    "%s\\..\\iscsiboot.inf", bin_path );
+		    "%s\\..\\sanbootconf.inf", bin_path );
 	len = GetFullPathName ( inf_rel_path, array_size ( inf_path ),
 				inf_path, NULL );
 	if ( ( len == 0 ) || ( len >= array_size ( inf_path ) ) )
@@ -441,7 +441,7 @@ int __cdecl main ( int argc, char **argv ) {
 		goto fail;
 
 	/* Success */
-	printf ( "iSCSI Boot Driver installed successfully\n" );
+	printf ( "SAN Boot Configuration Driver installed successfully\n" );
 
 	( VOID ) argc;
 	exit ( EXIT_SUCCESS );

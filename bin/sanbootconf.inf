@@ -3,17 +3,17 @@ Signature = "$Windows NT$"
 Class = System
 ClassGUID = {4d36e97d-e325-11ce-bfc1-08002be10318}
 Provider = %fensys%
-CatalogFile = iscsiboot.cat
-DriverVer = 12/01/2008,0.1
+CatalogFile = sanbootconf.cat
+DriverVer = 22/10/2009,0.2
 
 [Manufacturer]
 %fensys% = FenSystems,ntx86,ntamd64
 
 [FenSystems.ntx86]
-%iscsiboot% = iscsiboot,ROOT\iscsiboot
+%sanbootconf% = sanbootconf,ROOT\sanbootconf
 
 [FenSystems.ntamd64]
-%iscsiboot% = iscsiboot,ROOT\iscsiboot
+%sanbootconf% = sanbootconf,ROOT\sanbootconf
 
 [SourceDisksNames.x86]
 1 = %srcdisk%,,,\i386
@@ -22,31 +22,31 @@ DriverVer = 12/01/2008,0.1
 2 = %srcdisk%,,,\amd64
 
 [SourceDisksFiles.x86]
-iscsiboot.sys=1
+sanbootconf.sys=1
 
 [SourceDisksFiles.amd64]
-iscsiboot.sys=2
+sanbootconf.sys=2
 
 [DestinationDirs]
 Files.Driver = 12
 
 [Files.Driver]
-iscsiboot.sys
+sanbootconf.sys
 
-[iscsiboot]
+[sanbootconf]
 CopyFiles = Files.Driver
 
-[iscsiboot.Services]
-AddService = iscsiboot,0x00000002,Service
+[sanbootconf.Services]
+AddService = sanbootconf,0x00000002,Service
 
 [Service]
 ServiceType = 0x1
 StartType = 0x0
 LoadOrderGroup = Base
 ErrorControl = 0x1
-ServiceBinary = %12%\iscsiboot.sys
+ServiceBinary = %12%\sanbootconf.sys
 
 [Strings]
 fensys = "Fen Systems Ltd."
-iscsiboot = "iSCSI Boot Driver"
+sanbootconf = "SAN Boot Configuration Driver"
 srcdisk = "Installation media"

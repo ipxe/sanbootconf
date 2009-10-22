@@ -1,4 +1,4 @@
-TARGETNAME = iscsiboot
+TARGETNAME = sanbootconf
 
 TARGETTYPE = DRIVER
 
@@ -8,4 +8,4 @@ TARGETLIBS = $(DDK_LIB_PATH)\ndis.lib $(DDK_LIB_PATH)\ntstrsafe.lib $(DDK_LIB_PA
 
 MSC_WARNING_LEVEL = /W4 /Wp64 /WX
 
-SOURCES = iscsiboot.c
+SOURCES = sanbootconf.c

@@ -31,7 +31,7 @@
 #include "ibft.h"
 
 /** Tag to use for memory allocation */
-#define ISCSIBOOT_POOL_TAG 'bcsi'
+#define SANBOOTCONF_POOL_TAG 'fcbs'
 
 /** Start of region to scan in base memory */
 #define BASEMEM_START 0x80000
@@ -164,7 +164,7 @@ static NTSTATUS fetch_reg_kvi ( HANDLE reg_key, LPCWSTR value_name,
 
 	/* Allocate value buffer */
 	*kvi = ExAllocatePoolWithTag ( NonPagedPool, kvi_len,
-				       ISCSIBOOT_POOL_TAG );
+				       SANBOOTCONF_POOL_TAG );
 	if ( ! *kvi ) {
 		DbgPrint ( "Could not allocate KVI for \"%S\": %x\n",
 			   value_name, status );
@@ -214,7 +214,7 @@ static NTSTATUS fetch_reg_sz ( HANDLE reg_key, LPCWSTR value_name,
 	/* Allocate and populate string */
 	value_len = ( kvi->DataLength + sizeof ( value[0] ) );
 	*value = ExAllocatePoolWithTag ( NonPagedPool, value_len,
-					 ISCSIBOOT_POOL_TAG );
+					 SANBOOTCONF_POOL_TAG );
 	if ( ! *value ) {
 		DbgPrint ( "Could not allocate value for \"%S\"\n",
 			   value_name );
@@ -269,7 +269,7 @@ static NTSTATUS fetch_reg_multi_sz ( HANDLE reg_key, LPCWSTR value_name,
 	values_len = ( ( ( num_strings + 1 ) * sizeof ( values[0] ) ) +
 		       kvi->DataLength + sizeof ( values[0][0] ) );
 	*values = ExAllocatePoolWithTag ( NonPagedPool, values_len,
-					  ISCSIBOOT_POOL_TAG );
+					  SANBOOTCONF_POOL_TAG );
 	if ( ! *values ) {
 		DbgPrint ( "Could not allocate value array for \"%S\"\n",
 			   value_name );
@@ -351,7 +351,7 @@ static NTSTATUS reg_store_multi_sz ( HANDLE reg_key, LPCWSTR value_name,
 
 	/* Allocate buffer */
 	values = ExAllocatePoolWithTag ( NonPagedPool, values_len,
-					 ISCSIBOOT_POOL_TAG );
+					 SANBOOTCONF_POOL_TAG );
 	if ( ! values ) {
 		DbgPrint ( "Could not allocate value buffer for \"%S\"\n" );
 		status = STATUS_UNSUCCESSFUL;
@@ -454,7 +454,7 @@ static NTSTATUS find_ibft ( PIBFT_TABLE *ibft_copy ) {
 		/* Create copy of iBFT */
 		*ibft_copy = ExAllocatePoolWithTag ( NonPagedPool,
 						     ibft->acpi.length,
-						     ISCSIBOOT_POOL_TAG );
+						     SANBOOTCONF_POOL_TAG );
 		if ( ! *ibft_copy ) {
 			DbgPrint ( "Could not allocate iBFT copy\n" );
 			status = STATUS_NO_MEMORY;
@@ -764,7 +764,7 @@ static NTSTATUS store_tcpip_parameters ( PIBFT_NIC nic,
 			   wcslen ( netcfginstanceid ) + 1 ) *
 			 sizeof ( key_name[0] ) );
 	key_name = ExAllocatePoolWithTag ( NonPagedPool, key_name_len,
-					   ISCSIBOOT_POOL_TAG );
+					   SANBOOTCONF_POOL_TAG );
 	if ( ! key_name ) {
 		DbgPrint ( "Could not allocate TCP/IP key name\n" );
 		status = STATUS_UNSUCCESSFUL;
@@ -1149,7 +1149,7 @@ NTSTATUS DriverEntry ( IN PDRIVER_OBJECT DriverObject,
 	PIBFT_TABLE ibft;
 	NTSTATUS status;
 
-	DbgPrint ( "iSCSI Boot Parameter Driver initialising\n" );
+	DbgPrint ( "SAN Boot Configuration Driver initialising\n" );
 
 	/* Scan for iBFT */
 	status = find_ibft ( &ibft );
@@ -1175,7 +1175,7 @@ NTSTATUS DriverEntry ( IN PDRIVER_OBJECT DriverObject,
 	if ( ! NT_SUCCESS ( status ) )
 		goto err_create_iscsiboot_device;
 
-	DbgPrint ( "iSCSI Boot Parameter Driver initialisation complete\n" );
+	DbgPrint ( "SAN Boot Configuration Driver initialisation complete\n" );
 
  err_create_iscsiboot_device:
  err_no_ibft:
