@@ -1,6 +1,6 @@
 @echo off
 
-if "%ddkdir%" == "" set ddkdir=C:\WinDDK\6001.18001
+if "%ddkdir%" == "" set ddkdir=C:\WinDDK\6001.18002
 
 for /f "delims=" %%i in ('cd') do set cwd=%%i
 
