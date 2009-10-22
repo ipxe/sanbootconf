@@ -21,7 +21,7 @@
 #include "acpi.h"
 
 /** Start of region to scan in base memory */
-#define BASEMEM_START 0x80000
+#define BASEMEM_START 0x0
 
 /** End of region to scan in base memory */
 #define BASEMEM_END 0xa0000
