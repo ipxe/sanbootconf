@@ -15,7 +15,7 @@ goto :end
 set subdir=%cwd%\%1
 set ddkenv=%2 %3 %4
 echo Building %subdir% for %ddkenv%
-cmd /c "%ddkdir%\bin\setenv.bat %ddkdir% %ddkenv% && cd /d %subdir% && build /c" || exit /b 1
+cmd /c "%ddkdir%\bin\setenv.bat %ddkdir% %ddkenv% && cd /d %subdir% && build /cwg" || exit /b 1
 goto :end
 
 :end
