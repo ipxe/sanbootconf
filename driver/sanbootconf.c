@@ -24,6 +24,9 @@
 #include "ibft.h"
 #include "sbft.h"
 
+/** Maximum time to wait for boot disk, in seconds */
+#define SANBOOTCONF_MAX_WAIT 60
+
 /** Device private data */
 typedef struct _SANBOOTCONF_PRIV {
 	/* Copy of iBFT, if any */
@@ -174,6 +177,37 @@ static NTSTATUS create_sanbootconf_device ( PDRIVER_OBJECT driver,
 }
 
 /**
+ * Wait for SAN boot disk to appear
+ *
+ * @v driver		Driver object
+ * @v context		Context
+ * @v count		Number of times this routine has been called
+ */
+static VOID sanbootconf_wait ( PDRIVER_OBJECT driver, PVOID context,
+			       ULONG count ) {
+	LARGE_INTEGER delay;
+
+	DbgPrint ( "Waiting for SAN boot disk (attempt %ld)\n", count );
+
+	/* Check for existence of boot disk */
+	// hack
+	if ( count == 3 )
+		return;
+
+	/* Give up after too many attempts */
+	if ( count >= SANBOOTCONF_MAX_WAIT ) {
+		DbgPrint ( "Giving up waiting for SAN boot disk\n" );
+		return;
+	}
+
+	/* Sleep for a second, reschedule self */
+	delay.QuadPart = -10000000L /* 1 second, relative to current time */;
+	KeDelayExecutionThread ( KernelMode, FALSE, &delay );
+	IoRegisterBootDriverReinitialization ( driver, sanbootconf_wait,
+					       context );
+}
+
+/**
  * Driver entry point
  *
  * @v DriverObject	Driver object
@@ -186,6 +220,7 @@ NTSTATUS DriverEntry ( IN PDRIVER_OBJECT DriverObject,
 	PSANBOOTCONF_PRIV priv;
 	PACPI_DESCRIPTION_HEADER table;
 	NTSTATUS status;
+	BOOLEAN found_san = FALSE;
 
 	DbgPrint ( "SAN Boot Configuration Driver initialising\n" );
 
@@ -207,6 +242,7 @@ NTSTATUS DriverEntry ( IN PDRIVER_OBJECT DriverObject,
 	if ( NT_SUCCESS ( status ) ) {
 		priv->ibft = ( ( PIBFT_TABLE ) table );
 		parse_ibft ( priv->ibft );
+		found_san = TRUE;
 	} else {
 		/* Lack of an iBFT is not necessarily an error */
 		DbgPrint ( "No iBFT found\n" );
@@ -218,10 +254,21 @@ NTSTATUS DriverEntry ( IN PDRIVER_OBJECT DriverObject,
 	if ( NT_SUCCESS ( status ) ) {
 		priv->sbft = ( ( PSBFT_TABLE ) table );
 		parse_sbft ( priv->sbft );
+		found_san = TRUE;
 	} else {
 		/* Lack of an sBFT is not necessarily an error */
 		DbgPrint ( "No sBFT found\n" );
 		status = STATUS_SUCCESS;
+	}
+
+	/* Wait for boot disk, if booting from SAN */
+	if ( found_san ) {
+		DbgPrint ( "Attempting SAN boot; will wait for boot disk\n" );
+		IoRegisterBootDriverReinitialization ( DriverObject,
+						       sanbootconf_wait,
+						       NULL );
+	} else {
+		DbgPrint ( "No SAN boot method detected\n" );
 	}
 
 	DbgPrint ( "SAN Boot Configuration Driver initialisation complete\n" );
