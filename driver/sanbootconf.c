@@ -25,8 +25,8 @@
 #include "ibft.h"
 #include "sbft.h"
 
-/** Maximum time to wait for boot disk, in seconds */
-#define SANBOOTCONF_MAX_WAIT 60
+/** Maximum time to wait for system disk, in seconds */
+#define SANBOOTCONF_MAX_WAIT 120
 
 /** Device private data */
 typedef struct _SANBOOTCONF_PRIV {
@@ -233,54 +233,35 @@ static NTSTATUS fetch_partition_info ( PUNICODE_STRING name,
 	/* Extract partition information */
 	partition_info = DiskGeometryGetPartition ( &buf.geometry );
 	memcpy ( info, partition_info, sizeof ( *info ) );
-	switch ( partition_info->PartitionStyle ) {
-	case PARTITION_STYLE_MBR:
-		DbgPrint ( "MBR partition table with signature %08lx\n",
-			   partition_info->Mbr.Signature );
-		break;
-	case PARTITION_STYLE_GPT:
-		DbgPrint ( "GPT partition table\n" );
-		break;
-	default:
-		DbgPrint ( "Unknown partition table type\n" );
-		break;
-	}
 
 	return STATUS_SUCCESS;
 }
 
 /**
- * Check for boot disk
+ * Check for system disk
  *
  * @v name		Disk device name
+ * @v boot_info		Boot disk information
  * @ret status		NT status
  */
-static NTSTATUS check_boot_disk ( PUNICODE_STRING name ) {
+static NTSTATUS check_system_disk ( PUNICODE_STRING name,
+				    PBOOTDISK_INFORMATION_EX boot_info ) {
 	BOOLEAN must_disable;
 	PFILE_OBJECT file;
 	PDEVICE_OBJECT device;
 	DISK_PARTITION_INFO info;
 	NTSTATUS status;
 
-	DbgPrint ( "Found disk \"%wZ\"\n", name );
-
 	/* Enable interface if not already done */
 	status = IoSetDeviceInterfaceState ( name, TRUE );
 	must_disable = ( NT_SUCCESS ( status ) ? TRUE : FALSE );
-	DbgPrint ( "...%s enabled\n",
-		   ( must_disable ? "forcibly" : "already" ) );
 
 	/* Get device and file object pointers */
 	status = IoGetDeviceObjectPointer ( name, FILE_ALL_ACCESS, &file,
 					    &device );
 	if ( ! NT_SUCCESS ( status ) ) {
-
-		/* Not an error, apparently; IoGetDeviceInterfaces()
-		 * seems to return a whole load of interfaces that
-		 * aren't attached to any objects.
-		 */
-		DbgPrint ( "...could not get device object pointer: %x\n",
-			   status );
+		/* Most probably not yet attached */
+		DbgPrint ( "  Disk unavailable (%lx): \"%wZ\"\n", status, name );
 		goto err_iogetdeviceobjectpointer;
 	}
 
@@ -288,10 +269,37 @@ static NTSTATUS check_boot_disk ( PUNICODE_STRING name ) {
 	status = fetch_partition_info ( name, device, file, &info );
 	if ( ! NT_SUCCESS ( status ) )
 		goto err_fetch_partition_info;
+	switch ( info.PartitionStyle ) {
+	case PARTITION_STYLE_MBR:
+		DbgPrint ( "  MBR %08lx: \"%wZ\"\n",
+			   info.Mbr.Signature, name );
+		if ( boot_info->SystemDeviceIsGpt )
+			goto err_not_system_disk;
+		if ( info.Mbr.Signature != boot_info->SystemDeviceSignature )
+			goto err_not_system_disk;
+		break;
+	case PARTITION_STYLE_GPT:
+		DbgPrint ( "  GPT " GUID_FMT ": \"%wZ\"\n",
+			   GUID_ARGS ( info.Gpt.DiskId ), name );
+		if ( ! boot_info->SystemDeviceIsGpt )
+			goto err_not_system_disk;
+		if ( ! IsEqualGUID ( &info.Gpt.DiskId,
+				     &boot_info->SystemDeviceGuid ) )
+			goto err_not_system_disk;
+		break;
+	default:
+		DbgPrint ( "  Unhandled disk style %d: \"%wZ\"\n",
+			   info.PartitionStyle, name );
+		status = STATUS_NOT_SUPPORTED;
+		goto err_unknown_type;
+	}
 
+	/* Success */
+	DbgPrint ( "Found system disk at \"%wZ\"\n", name );
+	status = STATUS_SUCCESS;
 
-	status = STATUS_UNSUCCESSFUL;
-
+ err_not_system_disk:
+ err_unknown_type:
  err_fetch_partition_info:
 	/* Drop object reference */
 	ObDereferenceObject ( file );
@@ -303,15 +311,47 @@ static NTSTATUS check_boot_disk ( PUNICODE_STRING name ) {
 }
 
 /**
- * Find boot disk
+ * Find system disk
  *
  * @ret status		NT status
  */
-static NTSTATUS find_boot_disk ( VOID ) {
+static NTSTATUS find_system_disk ( VOID ) {
+	union {
+		BOOTDISK_INFORMATION basic;
+		BOOTDISK_INFORMATION_EX extended;
+	} boot_info;
 	PWSTR symlinks;
 	PWSTR symlink;
 	UNICODE_STRING u_symlink;
 	NTSTATUS status;
+
+	/* Get boot disk information */
+	RtlZeroMemory ( &boot_info, sizeof ( boot_info ) );
+	status = IoGetBootDiskInformation ( &boot_info.basic,
+					    sizeof ( boot_info ) );
+	if ( ! NT_SUCCESS ( status ) ) {
+		DbgPrint ( "Could not get boot disk information: %x\n",
+			   status );
+		goto err_getbootdiskinformation;
+	}
+	if ( boot_info.extended.SystemDeviceIsGpt ) {
+		DbgPrint ( "  System disk is GPT " GUID_FMT ",",
+			   GUID_ARGS ( boot_info.extended.SystemDeviceGuid ) );
+	} else if ( boot_info.extended.SystemDeviceSignature ) {
+		DbgPrint ( "  System disk is MBR %08lx,",
+			   boot_info.extended.SystemDeviceSignature );
+	} else {
+		DbgPrint ( "  System disk is <unknown>," );
+	}
+	if ( boot_info.extended.BootDeviceIsGpt ) {
+		DbgPrint ( " boot disk is GPT " GUID_FMT "\n",
+			   GUID_ARGS ( boot_info.extended.BootDeviceGuid ) );
+	} else if ( boot_info.extended.BootDeviceSignature ) {
+		DbgPrint ( " boot disk is MBR %08lx\n",
+			   boot_info.extended.BootDeviceSignature );
+	} else {
+		DbgPrint ( " boot disk is <unknown>\n" );
+	}
 
 	/* Enumerate all disks */
 	status = IoGetDeviceInterfaces ( &GUID_DEVINTERFACE_DISK, NULL,
@@ -319,28 +359,27 @@ static NTSTATUS find_boot_disk ( VOID ) {
 					 &symlinks );
 	if ( ! NT_SUCCESS ( status ) ) {
 		DbgPrint ( "Could not fetch disk list: %x\n", status );
-		return status;
+		goto err_getdeviceinterfaces;
 	}
 
-	/* Look for the boot disk */
+	/* Look for the system disk */
 	for ( symlink = symlinks ;
 	      RtlInitUnicodeString ( &u_symlink, symlink ) , *symlink ;
 	      symlink += ( ( u_symlink.Length / sizeof ( *symlink ) ) + 1 ) ) {
-		status = check_boot_disk ( &u_symlink );
+		status = check_system_disk ( &u_symlink, &boot_info.extended );
 		if ( NT_SUCCESS ( status ) )
-			goto out;
+			break;
 	}
-	status = STATUS_UNSUCCESSFUL;
 
- out:
 	/* Free object list */
 	ExFreePool ( symlinks );
-
+ err_getdeviceinterfaces:
+ err_getbootdiskinformation:
 	return status;
 }
 
 /**
- * Wait for SAN boot disk to appear
+ * Wait for SAN system disk to appear
  *
  * @v driver		Driver object
  * @v context		Context
@@ -351,21 +390,18 @@ static VOID sanbootconf_wait ( PDRIVER_OBJECT driver, PVOID context,
 	LARGE_INTEGER delay;
 	NTSTATUS status;
 
-	DbgPrint ( "Waiting for SAN boot disk (attempt %ld)\n", count );
+	DbgPrint ( "Waiting for SAN system disk (attempt %ld)\n", count );
 
-	/* Check for existence of boot disk */
-	status = find_boot_disk();
-	if ( NT_SUCCESS ( status ) )
-		return;
-
-	if ( count >= 10 ) {
-		DbgPrint ( "*** HACK ***\n" );
+	/* Check for existence of system disk */
+	status = find_system_disk();
+	if ( NT_SUCCESS ( status ) ) {
+		DbgPrint ( "Found SAN system disk; proceeding with boot\n" );
 		return;
 	}
 
 	/* Give up after too many attempts */
 	if ( count >= SANBOOTCONF_MAX_WAIT ) {
-		DbgPrint ( "Giving up waiting for SAN boot disk\n" );
+		DbgPrint ( "Giving up waiting for SAN system disk\n" );
 		return;
 	}
 
@@ -430,17 +466,15 @@ NTSTATUS DriverEntry ( IN PDRIVER_OBJECT DriverObject,
 		status = STATUS_SUCCESS;
 	}
 
-	/* Wait for boot disk, if booting from SAN */
+	/* Wait for system disk, if booting from SAN */
 	if ( found_san ) {
-		DbgPrint ( "Attempting SAN boot; will wait for boot disk\n" );
+		DbgPrint ( "Attempting SAN boot; will wait for system disk\n");
 		IoRegisterBootDriverReinitialization ( DriverObject,
 						       sanbootconf_wait,
 						       NULL );
 	} else {
 		DbgPrint ( "No SAN boot method detected\n" );
 	}
-
-	DbgPrint ( "SAN Boot Configuration Driver initialisation complete\n" );
 
  err_create_sanbootconf_device:
 	( VOID ) RegistryPath;
