@@ -19,6 +19,7 @@
 #include <ntddk.h>
 #include <initguid.h>
 #include <wdmsec.h>
+#include <ntdddisk.h>
 #include "sanbootconf.h"
 #include "acpi.h"
 #include "ibft.h"
@@ -177,6 +178,168 @@ static NTSTATUS create_sanbootconf_device ( PDRIVER_OBJECT driver,
 }
 
 /**
+ * Fetch disk signature
+ *
+ * @v name		Disk device name
+ * @v device		Disk device object
+ * @v file		Disk file object
+ * @v info		Partition information buffer
+ * @ret status		NT status
+ */
+static NTSTATUS fetch_partition_info ( PUNICODE_STRING name,
+				       PDEVICE_OBJECT device,
+				       PFILE_OBJECT file,
+				       PDISK_PARTITION_INFO info ) {
+	KEVENT event;
+	struct {
+		DISK_GEOMETRY_EX geometry;
+		DISK_PARTITION_INFO __dummy_partition_info;
+		DISK_DETECTION_INFO __dummy_detection_info;
+	} buf;
+	IO_STATUS_BLOCK io_status;
+	PIRP irp;
+	PIO_STACK_LOCATION io_stack;
+	PDISK_PARTITION_INFO partition_info;
+	NTSTATUS status;
+
+	/* Construct IRP to fetch drive geometry */
+	KeInitializeEvent ( &event, NotificationEvent, FALSE );
+	irp = IoBuildDeviceIoControlRequest ( IOCTL_DISK_GET_DRIVE_GEOMETRY_EX,
+					      device, NULL, 0, &buf,
+					      sizeof ( buf ), FALSE, &event,
+					      &io_status );
+	if ( ! irp ) {
+		DbgPrint ( "Could not build IRP to retrieve geometry for "
+			   "\"%wZ\"\n", name );
+		return STATUS_UNSUCCESSFUL;
+	}
+	io_stack = IoGetNextIrpStackLocation ( irp );
+	io_stack->FileObject = file;
+
+	/* Issue IRP */
+	status = IoCallDriver ( device, irp );
+	if ( status == STATUS_PENDING ) {
+		status = KeWaitForSingleObject ( &event, Executive, KernelMode,
+						 FALSE, NULL );
+	}
+	if ( NT_SUCCESS ( status ) )
+		status = io_status.Status;
+	if ( ! NT_SUCCESS ( status ) ) {
+		DbgPrint ( "IRP failed to retrieve geometry for \"%wZ\": %x\n",
+			   name, status );
+		return status;
+	}
+
+	/* Extract partition information */
+	partition_info = DiskGeometryGetPartition ( &buf.geometry );
+	memcpy ( info, partition_info, sizeof ( *info ) );
+	switch ( partition_info->PartitionStyle ) {
+	case PARTITION_STYLE_MBR:
+		DbgPrint ( "MBR partition table with signature %08lx\n",
+			   partition_info->Mbr.Signature );
+		break;
+	case PARTITION_STYLE_GPT:
+		DbgPrint ( "GPT partition table\n" );
+		break;
+	default:
+		DbgPrint ( "Unknown partition table type\n" );
+		break;
+	}
+
+	return STATUS_SUCCESS;
+}
+
+/**
+ * Check for boot disk
+ *
+ * @v name		Disk device name
+ * @ret status		NT status
+ */
+static NTSTATUS check_boot_disk ( PUNICODE_STRING name ) {
+	BOOLEAN must_disable;
+	PFILE_OBJECT file;
+	PDEVICE_OBJECT device;
+	DISK_PARTITION_INFO info;
+	NTSTATUS status;
+
+	DbgPrint ( "Found disk \"%wZ\"\n", name );
+
+	/* Enable interface if not already done */
+	status = IoSetDeviceInterfaceState ( name, TRUE );
+	must_disable = ( NT_SUCCESS ( status ) ? TRUE : FALSE );
+	DbgPrint ( "...%s enabled\n",
+		   ( must_disable ? "forcibly" : "already" ) );
+
+	/* Get device and file object pointers */
+	status = IoGetDeviceObjectPointer ( name, FILE_ALL_ACCESS, &file,
+					    &device );
+	if ( ! NT_SUCCESS ( status ) ) {
+
+		/* Not an error, apparently; IoGetDeviceInterfaces()
+		 * seems to return a whole load of interfaces that
+		 * aren't attached to any objects.
+		 */
+		DbgPrint ( "...could not get device object pointer: %x\n",
+			   status );
+		goto err_iogetdeviceobjectpointer;
+	}
+
+	/* Get disk signature */
+	status = fetch_partition_info ( name, device, file, &info );
+	if ( ! NT_SUCCESS ( status ) )
+		goto err_fetch_partition_info;
+
+
+	status = STATUS_UNSUCCESSFUL;
+
+ err_fetch_partition_info:
+	/* Drop object reference */
+	ObDereferenceObject ( file );
+ err_iogetdeviceobjectpointer:
+	/* Disable interface if we had to enable it */
+	if ( must_disable )
+		IoSetDeviceInterfaceState ( name, FALSE );
+	return status;
+}
+
+/**
+ * Find boot disk
+ *
+ * @ret status		NT status
+ */
+static NTSTATUS find_boot_disk ( VOID ) {
+	PWSTR symlinks;
+	PWSTR symlink;
+	UNICODE_STRING u_symlink;
+	NTSTATUS status;
+
+	/* Enumerate all disks */
+	status = IoGetDeviceInterfaces ( &GUID_DEVINTERFACE_DISK, NULL,
+					 DEVICE_INTERFACE_INCLUDE_NONACTIVE,
+					 &symlinks );
+	if ( ! NT_SUCCESS ( status ) ) {
+		DbgPrint ( "Could not fetch disk list: %x\n", status );
+		return status;
+	}
+
+	/* Look for the boot disk */
+	for ( symlink = symlinks ;
+	      RtlInitUnicodeString ( &u_symlink, symlink ) , *symlink ;
+	      symlink += ( ( u_symlink.Length / sizeof ( *symlink ) ) + 1 ) ) {
+		status = check_boot_disk ( &u_symlink );
+		if ( NT_SUCCESS ( status ) )
+			goto out;
+	}
+	status = STATUS_UNSUCCESSFUL;
+
+ out:
+	/* Free object list */
+	ExFreePool ( symlinks );
+
+	return status;
+}
+
+/**
  * Wait for SAN boot disk to appear
  *
  * @v driver		Driver object
@@ -186,13 +349,19 @@ static NTSTATUS create_sanbootconf_device ( PDRIVER_OBJECT driver,
 static VOID sanbootconf_wait ( PDRIVER_OBJECT driver, PVOID context,
 			       ULONG count ) {
 	LARGE_INTEGER delay;
+	NTSTATUS status;
 
 	DbgPrint ( "Waiting for SAN boot disk (attempt %ld)\n", count );
 
 	/* Check for existence of boot disk */
-	// hack
-	if ( count == 3 )
+	status = find_boot_disk();
+	if ( NT_SUCCESS ( status ) )
 		return;
+
+	if ( count >= 10 ) {
+		DbgPrint ( "*** HACK ***\n" );
+		return;
+	}
 
 	/* Give up after too many attempts */
 	if ( count >= SANBOOTCONF_MAX_WAIT ) {
