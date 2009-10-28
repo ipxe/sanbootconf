@@ -179,6 +179,44 @@ static LONG service_exists ( LPWSTR service_name ) {
 }
 
 /**
+ * Set service group
+ *
+ * @v service_name	Service name
+ * @v group_name	Group name
+ * @ret err		Error status
+ */
+static LONG set_service_group ( LPWSTR service_name, LPWSTR group_name ) {
+	WCHAR services_key_name[] =
+		L"SYSTEM\\CurrentControlSet\\Services";
+	HKEY services;
+	LONG err;
+
+	printf ( "Moving \"%S\" service to \"%S\" group\n",
+		 service_name, group_name );
+
+	/* Open Services key */
+	err = reg_open ( HKEY_LOCAL_MACHINE, services_key_name, &services );
+	if ( err != ERROR_SUCCESS )
+		goto err_reg_open;
+
+	/* Set service group */
+	err = reg_set_sz ( services, service_name, L"Group", group_name );
+	if ( err != ERROR_SUCCESS ) {
+		eprintf ( "Could not move \"%S\" service to \"%S\" group: "
+			  "%x\n", service_name, group_name, err );
+		goto err_set_sz;
+	}
+
+	/* Success */
+	err = ERROR_SUCCESS;
+
+ err_set_sz:
+ err_reg_open:
+	reg_close ( services );
+	return err;
+}
+
+/**
  * Set service to start at boot time
  *
  * @v service_name	Service name
@@ -372,7 +410,9 @@ static LONG fix_registry ( void ) {
 	if ( ( err = fix_service_group_order() ) != ERROR_SUCCESS )
 		return err;
 
-	/* Set relevant services to be boot-start */
+	/*
+	 * Set relevant services to be boot-start
+	 */
 	if ( ( err = set_boot_start ( L"NDIS" ) ) != ERROR_SUCCESS )
 		return err;
 	if ( ( err = set_boot_start ( L"Tcpip" ) ) != ERROR_SUCCESS )
@@ -383,7 +423,34 @@ static LONG fix_registry ( void ) {
 	if ( ( ( err = service_exists ( L"PSched" ) ) == ERROR_SUCCESS ) &&
 	     ( ( err = set_boot_start ( L"PSched" ) ) != ERROR_SUCCESS ) )
 		return err;
+	/* ibiou and ibsrp are present only when WinOF is installed */
+	if ( ( ( err = service_exists ( L"ibiou" ) ) == ERROR_SUCCESS ) &&
+	     ( ( err = set_boot_start ( L"ibiou" ) ) != ERROR_SUCCESS ) )
+		return err;
+	if ( ( ( err = service_exists ( L"ibsrp" ) ) == ERROR_SUCCESS ) &&
+	     ( ( err = set_boot_start ( L"ibsrp" ) ) != ERROR_SUCCESS ) )
+		return err;
 	if ( ( err = set_boot_start_nics() ) != ERROR_SUCCESS )
+		return err;
+
+	/*
+	 * Move relevant services to NDIS group
+	 */
+	if ( ( ( err = service_exists ( L"ibbus" ) ) == ERROR_SUCCESS ) &&
+	     ( ( err = set_service_group ( L"ibbus",
+					   L"NDIS" ) ) != ERROR_SUCCESS ) )
+		return err;
+	if ( ( ( err = service_exists ( L"winmad" ) ) == ERROR_SUCCESS ) &&
+	     ( ( err = set_service_group ( L"winmad",
+					   L"NDIS" ) ) != ERROR_SUCCESS ) )
+		return err;
+	if ( ( ( err = service_exists ( L"winverbs" ) ) == ERROR_SUCCESS ) &&
+	     ( ( err = set_service_group ( L"winverbs",
+					   L"NDIS" ) ) != ERROR_SUCCESS ) )
+		return err;
+	if ( ( ( err = service_exists ( L"mlx4_hca" ) ) == ERROR_SUCCESS ) &&
+	     ( ( err = set_service_group ( L"mlx4_hca",
+					   L"NDIS" ) ) != ERROR_SUCCESS ) )
 		return err;
 
 	return ERROR_SUCCESS;
