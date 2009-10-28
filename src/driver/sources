@@ -2,7 +2,7 @@ TARGETNAME = sanbootconf
 
 TARGETTYPE = DRIVER
 
-TARGETPATH = ..\bin
+TARGETPATH = ..\..\bin
 
 TARGETLIBS = $(DDK_LIB_PATH)\ndis.lib $(DDK_LIB_PATH)\ntstrsafe.lib $(DDK_LIB_PATH)\wdmsec.lib
 

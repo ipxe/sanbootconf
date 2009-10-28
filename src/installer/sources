@@ -2,7 +2,7 @@ TARGETNAME = setup
 
 TARGETTYPE = PROGRAM
 
-TARGETPATH = ..\bin
+TARGETPATH = ..\..\bin
 
 TARGETLIBS = $(DDK_LIB_PATH)\setupapi.lib \
 	     $(DDK_LIB_PATH)\newdev.lib
