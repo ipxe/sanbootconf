@@ -254,6 +254,24 @@ LONG reg_query_sz ( HKEY key, LPCWSTR subkey_name, LPCWSTR value_name,
 }
 
 /**
+ * Write REG_SZ value
+ *
+ * @v key		Registry key
+ * @v subkey_name	Registry subkey name, or NULL
+ * @v value_name	Registry value name
+ * @v sz		String
+ * @ret err		Error status
+ */
+LONG reg_set_sz ( HKEY key, LPCWSTR subkey_name, LPCWSTR value_name,
+		  LPWSTR sz ) {
+	SIZE_T len;
+
+	len = ( ( wcslen ( sz ) + 1 ) * sizeof ( sz[0] ) );
+	return reg_set_value ( key, subkey_name, value_name, REG_SZ,
+			       ( ( LPBYTE ) sz ), ( ( DWORD ) len ) );
+}
+
+/**
  * Read REG_MULTI_SZ value
  *
  * @v key		Registry key

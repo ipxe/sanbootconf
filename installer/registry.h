@@ -15,6 +15,8 @@ extern LONG reg_value_exists ( HKEY key, LPCWSTR subkey_name,
 			       LPCWSTR value_name );
 extern LONG reg_query_sz ( HKEY key, LPCWSTR subkey_name, LPCWSTR value_name,
 			   LPWSTR *sz );
+extern LONG reg_set_sz ( HKEY key, LPCWSTR subkey_name, LPCWSTR value_name,
+			 LPWSTR sz );
 extern LONG reg_query_multi_sz ( HKEY key, LPCWSTR subkey_name,
 				 LPCWSTR value_name, LPWSTR **multi_sz );
 extern LONG reg_set_multi_sz ( HKEY key, LPCWSTR subkey_name,
