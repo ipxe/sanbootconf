@@ -75,12 +75,12 @@ LONG reg_key_exists ( HKEY key, LPCWSTR subkey_name ) {
 	HKEY subkey;
 	LONG err;
 
-	err = reg_open ( key, subkey_name, &subkey );
-	if ( err != ERROR_SUCCESS )
-		return err;
+	err = RegOpenKeyExW ( key, subkey_name, 0, ( KEY_READ | KEY_WRITE ),
+			      &subkey );
+	if ( err == ERROR_SUCCESS )
+		RegCloseKey ( key );
 
-	reg_close ( subkey );
-	return ERROR_SUCCESS;
+	return err;
 }
 
 /**
