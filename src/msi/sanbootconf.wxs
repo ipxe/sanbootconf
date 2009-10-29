@@ -61,5 +61,17 @@
     <WixVariable Id="WixUILicenseRtf" Value="gpl.rtf" />
     <UIRef Id="WixUI_Minimal" />
 
+    <CustomAction Id="run_setup_bat"
+		  Directory="bin"
+		  ExeCommand="cmd.exe /c setup.bat"
+		  Execute="deferred"
+		  Return="check" />
+
+    <InstallExecuteSequence>
+      <Custom Action="run_setup_bat" Before="InstallFinalize">
+	<![CDATA[NOT Installed]]>
+      </Custom>
+    </InstallExecuteSequence>
+
   </Product>
 </Wix>
