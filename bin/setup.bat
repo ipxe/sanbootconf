@@ -8,12 +8,10 @@ if "%PROCESSOR_ARCHITECTURE%"=="AMD64" set cpu=amd64
 if "%PROCESSOR_ARCHITEW6432%"=="AMD64" set cpu=amd64
 if "%cpu%"=="" goto cpuerror
 
-%0\..\%cpu%\setup.exe
-goto :end
+%0\..\%cpu%\setup.exe || exit /B 1
+exit /B
 
 :cpuerror
 echo Could not determine CPU type
 pause
-goto :end
-
-:end
+exit /B 1
