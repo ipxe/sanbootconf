@@ -1,0 +1,65 @@
+<?xml version="1.0"?>
+<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
+  <Product Id="a18cf056-825b-46e1-87f9-ac7ffddf2b17"
+	   Name="SAN Boot Configuration Driver"
+	   Language="1033"
+           Version="0.9.4"
+	   Manufacturer="Fen Systems Ltd."
+	   UpgradeCode="27a32dd2-af56-454e-ab5f-8c7f12319dca" >
+    <Package Description="SAN Boot Configuration Driver"
+             Manufacturer="Fen Systems Ltd."
+	     InstallerVersion="200"
+	     Compressed="yes" />
+
+    <Media Id="1" Cabinet="sanbootconf.cab" EmbedCab="yes" />
+
+    <Directory Id="TARGETDIR" Name="SourceDir">
+      <Directory Id="ProgramFilesFolder" Name="ProgramFiles">
+        <Directory Id="bin" Name="SAN Boot Configuration Driver">
+	  <Component Id="bin" Guid="7abb2bf7-f57e-4d55-b1a6-85c584eb92c8">
+            <File Id="setup.bat" DiskId="1"
+		  Source="setup.bat" Name="setup.bat" />
+            <File Id="sanbootconf.inf" DiskId="1"
+		  Source="sanbootconf.inf" Name="sanbootconf.inf" />
+          </Component>
+	  <Directory Id="i386" Name="i386">
+	    <Component Id="i386" Guid="0b76f1aa-37ff-4712-9ad7-c19935d038f8">
+	      <Condition>
+		<![CDATA[(Not VersionNT64)]]>
+	      </Condition>
+	      <File Id="i386_setup.exe" DiskId="1"
+		    Source="i386\setup.exe" Name="setup.exe" />
+	      <File Id="i386_sanbootconf.sys" DiskId="1"
+		    Source="i386\sanbootconf.sys" Name="sanbootconf.sys" />
+	      <File Id="i386_sanbootconf.pdb" DiskId="1"
+		    Source="i386\sanbootconf.pdb" Name="sanbootconf.pdb" />
+	    </Component>
+	  </Directory>
+	  <Directory Id="amd64" Name="amd64">
+	    <Component Id="amd64" Guid="0341aee1-3717-47d4-a7c4-2d51560b2da1">
+	      <Condition>
+		<![CDATA[VersionNT64]]>
+	      </Condition>
+	      <File Id="amd64_setup.exe" DiskId="1"
+		    Source="amd64\setup.exe" Name="setup.exe" />
+	      <File Id="amd64_sanbootconf.sys" DiskId="1"
+		    Source="amd64\sanbootconf.sys" Name="sanbootconf.sys" />
+	      <File Id="amd64_sanbootconf.pdb" DiskId="1"
+		    Source="amd64\sanbootconf.pdb" Name="sanbootconf.pdb" />
+	    </Component>
+	  </Directory>
+        </Directory>
+      </Directory>
+    </Directory>
+
+    <Feature Id="feature" Title="SAN Boot Configuration Driver" Level="1">
+      <ComponentRef Id="bin" />
+      <ComponentRef Id="i386" />
+      <ComponentRef Id="amd64" />
+    </Feature>
+
+    <WixVariable Id="WixUILicenseRtf" Value="gpl.rtf" />
+    <UIRef Id="WixUI_Minimal" />
+
+  </Product>
+</Wix>
