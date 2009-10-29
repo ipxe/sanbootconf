@@ -1,5 +1,7 @@
 @echo off
 
+title SAN Boot Configuration Driver
+
 set cpu=
 if "%PROCESSOR_ARCHITECTURE%"=="x86" set cpu=i386
 if "%PROCESSOR_ARCHITECTURE%"=="AMD64" set cpu=amd64
