@@ -3,7 +3,7 @@
   <Product Id="a18cf056-825b-46e1-87f9-ac7ffddf2b17"
 	   Name="SAN Boot Configuration Driver"
 	   Language="1033"
-           Version="0.9.5"
+           Version="0.9.6"
 	   Manufacturer="Fen Systems Ltd."
 	   UpgradeCode="27a32dd2-af56-454e-ab5f-8c7f12319dca" >
     <Package Description="SAN Boot Configuration Driver"
