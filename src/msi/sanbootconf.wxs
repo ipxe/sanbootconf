@@ -21,6 +21,8 @@
 		  Source="setup.bat" Name="setup.bat" />
             <File Id="sanbootconf.inf" DiskId="1"
 		  Source="sanbootconf.inf" Name="sanbootconf.inf" />
+            <File Id="sanbootconf.cat" DiskId="1"
+		  Source="sanbootconf.cat" Name="sanbootconf.cat" />
           </Component>
 	  <Directory Id="i386" Name="i386">
 	    <Component Id="i386" Guid="0b76f1aa-37ff-4712-9ad7-c19935d038f8">
