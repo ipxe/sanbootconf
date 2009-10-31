@@ -1,15 +1,29 @@
 <?xml version="1.0"?>
+<?define VERSION="0.9.6" ?>
 <Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
-  <Product Id="a18cf056-825b-46e1-87f9-ac7ffddf2b17"
+  <Product Id="*"
 	   Name="SAN Boot Configuration Driver"
 	   Language="1033"
-           Version="0.9.6"
+           Version="$(var.VERSION)"
 	   Manufacturer="Fen Systems Ltd."
 	   UpgradeCode="27a32dd2-af56-454e-ab5f-8c7f12319dca" >
-    <Package Description="SAN Boot Configuration Driver"
+
+    <Package Id="*"
+	     Description="SAN Boot Configuration Driver"
              Manufacturer="Fen Systems Ltd."
 	     InstallerVersion="200"
 	     Compressed="yes" />
+
+    <Upgrade Id="27a32dd2-af56-454e-ab5f-8c7f12319dca">
+      <UpgradeVersion OnlyDetect="yes"
+		      Minimum="$(var.VERSION)"
+		      Property="NEWERVERSIONDETECTED"
+		      IncludeMinimum="no" />
+      <UpgradeVersion OnlyDetect="no"
+		      Maximum="$(var.VERSION)"
+		      Property="OLDERVERSIONBEINGUPGRADED"
+		      IncludeMaximum="no" />
+    </Upgrade>
 
     <Media Id="1" Cabinet="sanbootconf.cab" EmbedCab="yes" />
 
@@ -70,6 +84,7 @@
 		  Return="check" />
 
     <InstallExecuteSequence>
+      <RemoveExistingProducts After="InstallInitialize" />
       <Custom Action="run_setup_bat" Before="InstallFinalize">
 	<![CDATA[NOT Installed]]>
       </Custom>
