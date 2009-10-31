@@ -86,7 +86,7 @@
     <InstallExecuteSequence>
       <RemoveExistingProducts After="InstallInitialize" />
       <Custom Action="run_setup_bat" Before="InstallFinalize">
-	<![CDATA[NOT Installed]]>
+	<![CDATA[NOT REMOVE]]>
       </Custom>
     </InstallExecuteSequence>
 
