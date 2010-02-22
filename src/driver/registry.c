@@ -107,7 +107,7 @@ NTSTATUS fetch_reg_kvi ( HANDLE reg_key, LPCWSTR value_name,
 	return STATUS_SUCCESS;
 
  err_zwqueryvaluekey:
-	ExFreePool ( kvi );
+	ExFreePool ( *kvi );
  err_exallocatepoolwithtag_kvi:
  err_zwqueryvaluekey_len:
 	return status;
