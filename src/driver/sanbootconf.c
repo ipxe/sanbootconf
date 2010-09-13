@@ -24,6 +24,7 @@
 #include "acpi.h"
 #include "ibft.h"
 #include "sbft.h"
+#include "abft.h"
 
 /** Maximum time to wait for system disk, in seconds */
 #define SANBOOTCONF_MAX_WAIT 120
@@ -32,6 +33,8 @@
 typedef struct _SANBOOTCONF_PRIV {
 	/* Copy of iBFT, if any */
 	PACPI_DESCRIPTION_HEADER ibft;
+	/* Copy of aBFT, if any */
+	PACPI_DESCRIPTION_HEADER abft;
 	/* Copy of sBFT, if any */
 	PACPI_DESCRIPTION_HEADER sbft;
 } SANBOOTCONF_PRIV, *PSANBOOTCONF_PRIV;
@@ -43,6 +46,11 @@ DEFINE_GUID ( GUID_SANBOOTCONF_CLASS, 0x8a2f8602, 0x8f0b, 0x4138,
 /** IoControl code to retrieve iBFT */
 #define IOCTL_SANBOOTCONF_IBFT \
 	CTL_CODE ( FILE_DEVICE_UNKNOWN, 0x0001, METHOD_BUFFERED, \
+		   FILE_READ_ACCESS )
+
+/** IoControl code to retrieve aBFT */
+#define IOCTL_SANBOOTCONF_ABFT \
+	CTL_CODE ( FILE_DEVICE_UNKNOWN, 0x0861, METHOD_BUFFERED, \
 		   FILE_READ_ACCESS )
 
 /** IoControl code to retrieve sBFT */
@@ -120,6 +128,10 @@ static NTSTATUS sanbootconf_iocontrol_irp ( PDEVICE_OBJECT device, PIRP irp ) {
 	switch ( irpsp->Parameters.DeviceIoControl.IoControlCode ) {
 	case IOCTL_SANBOOTCONF_IBFT:
 		status = fetch_acpi_table_copy ( IBFT_SIG, priv->ibft,
+						 buf, len );
+		break;
+	case IOCTL_SANBOOTCONF_ABFT:
+		status = fetch_acpi_table_copy ( ABFT_SIG, priv->abft,
 						 buf, len );
 		break;
 	case IOCTL_SANBOOTCONF_SBFT:
@@ -479,6 +491,7 @@ NTSTATUS DriverEntry ( IN PDRIVER_OBJECT DriverObject,
 	/* Look for boot firmware tables*/
 	found_san =
 		( try_find_acpi_table ( IBFT_SIG, parse_ibft, &priv->ibft ) |
+		  try_find_acpi_table ( ABFT_SIG, parse_abft, &priv->abft ) |
 		  try_find_acpi_table ( SBFT_SIG, parse_sbft, &priv->sbft ) );
 
 	/* Wait for system disk, if booting from SAN */

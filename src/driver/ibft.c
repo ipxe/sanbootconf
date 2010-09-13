@@ -16,18 +16,14 @@
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
-#pragma warning(disable:4201)  /* nameless struct/union warning */
-#pragma warning(disable:4214)  /* non-int bitfield warning */
+#pragma warning(disable:4100)  /* unreferenced formal parameter */
 #pragma warning(disable:4327)  /* indirection alignment mismatch */
 
 #include <ntddk.h>
-#include <initguid.h>
 #include <ntstrsafe.h>
-#include <ndis.h>
-#include <ndisguid.h>
-#include <ntddndis.h>
 #include "sanbootconf.h"
 #include "registry.h"
+#include "nic.h"
 #include "ibft.h"
 
 /**
@@ -124,153 +120,6 @@ static VOID parse_ibft_initiator ( PIBFT_TABLE ibft,
 }
 
 /**
- * Fetch NIC MAC address
- *
- * @v name		NDIS device name
- * @v device		NDIS device object
- * @v file		NDIS file object
- * @v mac		MAC address buffer
- * @v mac_len		MAC address buffer length
- * @ret ntstatus	NT status
- */
-static NTSTATUS fetch_mac ( PUNICODE_STRING name, PDEVICE_OBJECT device,
-			    PFILE_OBJECT file, PUCHAR mac, ULONG mac_len ) {
-	KEVENT event;
-	ULONG in_buf;
-	IO_STATUS_BLOCK io_status;
-	PIRP irp;
-	PIO_STACK_LOCATION io_stack;
-	ULONG i;
-	NTSTATUS status;
-
-	/* Construct IRP to query MAC address */
-	KeInitializeEvent ( &event, NotificationEvent, FALSE );
-	in_buf = OID_802_3_CURRENT_ADDRESS;
-	irp = IoBuildDeviceIoControlRequest ( IOCTL_NDIS_QUERY_GLOBAL_STATS,
-					      device, &in_buf,
-					      sizeof ( in_buf ), mac, mac_len,
-					      FALSE, &event, &io_status );
-	if ( ! irp ) {
-		DbgPrint ( "Could not build IRP to retrieve MAC for \"%wZ\"\n",
-			   name );
-		return STATUS_UNSUCCESSFUL;
-	}
-	io_stack = IoGetNextIrpStackLocation( irp );
-	io_stack->FileObject = file;
-
-	/* Issue IRP */
-	status = IoCallDriver ( device, irp );
-	if ( status == STATUS_PENDING ) {
-		status = KeWaitForSingleObject ( &event, Executive, KernelMode,
-						 FALSE, NULL );
-	}
-	if ( NT_SUCCESS ( status ) )
-		status = io_status.Status;
-	if ( ! NT_SUCCESS ( status ) ) {
-		DbgPrint ( "IRP failed to retrieve MAC for \"%wZ\": %x\n",
-			   name, status );
-		return status;
-	}
-
-	/* Dump MAC address */
-	DbgPrint ( "Found NIC with MAC address" );
-	for ( i = 0 ; i < mac_len ; i++ )
-		DbgPrint ( "%c%02x", ( i ? ':' : ' ' ), mac[i] );
-	DbgPrint ( " at \"%wZ\"\n", name );
-
-	return STATUS_SUCCESS;
-}
-
-/**
- * Fetch NIC PDO
- *
- * @v name		NDIS device name
- * @v device		NDIS device object
- * @v pdo		Associated physical device object
- * @ret ntstatus	NT status
- */
-static NTSTATUS fetch_pdo ( PUNICODE_STRING name, PDEVICE_OBJECT device,
-			    PDEVICE_OBJECT *pdo ) {
-	KEVENT event;
-	IO_STATUS_BLOCK io_status;
-	PIRP irp;
-	PIO_STACK_LOCATION io_stack;
-	PDEVICE_RELATIONS relations;
-	NTSTATUS status;
-
-	/* Construct IRP to query MAC address */
-	KeInitializeEvent ( &event, NotificationEvent, FALSE );
-	irp = IoBuildSynchronousFsdRequest ( IRP_MJ_PNP, device, NULL, 0, NULL,
-					     &event, &io_status );
-	if ( ! irp ) {
-		DbgPrint ( "Could not build IRP to retrieve PDO for \"%wZ\"\n",
-			   name );
-		return STATUS_UNSUCCESSFUL;
-	}
-	io_stack = IoGetNextIrpStackLocation( irp );
-	io_stack->MinorFunction = IRP_MN_QUERY_DEVICE_RELATIONS;
-	io_stack->Parameters.QueryDeviceRelations.Type = TargetDeviceRelation;
-
-	/* Issue IRP */
-	status = IoCallDriver ( device, irp );
-	if ( status == STATUS_PENDING ) {
-		status = KeWaitForSingleObject ( &event, Executive, KernelMode,
-						 FALSE, NULL );
-	}
-	if ( NT_SUCCESS ( status ) )
-		status = io_status.Status;
-	if ( ! NT_SUCCESS ( status ) ) {
-		DbgPrint ( "IRP failed to retrieve PDO for \"%wZ\": %x\n",
-			   name, status );
-		return status;
-	}
-
-	/* Extract PDO */
-	relations = ( ( PDEVICE_RELATIONS ) io_status.Information );
-	*pdo = relations->Objects[0];
-
-	/* Free the relations list allocated by the IRP */
-	ExFreePool ( relations );
-
-	return STATUS_SUCCESS;
-}
-
-/**
- * Fetch NetCfgInstanceId registry value
- *
- * @v pdo		Physical device object
- * @v netcfginstanceid	Value to allocate and fill in
- * @ret ntstatus	NT status
- *
- * The caller must eventually free the allocated value.
- */
-static NTSTATUS fetch_netcfginstanceid ( PDEVICE_OBJECT pdo,
-					 LPWSTR *netcfginstanceid ) {
-	HANDLE reg_key;
-	NTSTATUS status;
-
-	/* Open driver registry key */
-	status = IoOpenDeviceRegistryKey ( pdo, PLUGPLAY_REGKEY_DRIVER,
-					   KEY_READ, &reg_key );
-	if ( ! NT_SUCCESS ( status ) ) {
-		DbgPrint ( "Could not open driver registry key for PDO %p: "
-			   "%x\n", pdo, status );
-		goto err_ioopendeviceregistrykey;
-	}
-
-	/* Read NetCfgInstanceId value */
-	status = fetch_reg_sz ( reg_key, L"NetCfgInstanceId",
-				netcfginstanceid );
-	if ( ! NT_SUCCESS ( status ) )
-		goto err_fetch_reg_wstr;
-
- err_fetch_reg_wstr:
-	ZwClose ( reg_key );
- err_ioopendeviceregistrykey:
-	return status;
-}
-
-/**
  * Store IPv4 parameter into a string registry value
  *
  * @v reg_key		Registry key
@@ -322,15 +171,18 @@ static NTSTATUS store_ipv4_parameter_multi_sz ( HANDLE reg_key,
 /**
  * Store TCP/IP parameters in registry
  *
- * @v nic		iBFT NIC structure
+ * @v pdo		Physical device object
  * @v netcfginstanceid	Interface name within registry
+ * @v opaque		iBFT NIC structure
  * @ret ntstatus	NT status
  */
-static NTSTATUS store_tcpip_parameters ( PIBFT_NIC nic,
-					 LPCWSTR netcfginstanceid ) {
+static NTSTATUS store_tcpip_parameters ( PDEVICE_OBJECT pdo,
+					 LPCWSTR netcfginstanceid,
+					 PVOID opaque ) {
 	LPCWSTR key_name_prefix = ( L"\\Registry\\Machine\\SYSTEM\\"
 				    L"CurrentControlSet\\Services\\"
 				    L"Tcpip\\Parameters\\Interfaces\\" );
+	PIBFT_NIC nic = opaque;
 	LPWSTR key_name;
 	SIZE_T key_name_len;
 	HANDLE reg_key;
@@ -365,7 +217,8 @@ static NTSTATUS store_tcpip_parameters ( PIBFT_NIC nic,
 		goto err_reg_store;
 
 	/* Store subnet mask */
-	subnet_mask = RtlUlongByteSwap ( 0xffffffffUL << ( 32 - nic->subnet_mask_prefix ) );
+	subnet_mask = RtlUlongByteSwap ( 0xffffffffUL <<
+					 ( 32 - nic->subnet_mask_prefix ) );
 	status = store_ipv4_parameter_multi_sz ( reg_key, L"SubnetMask",
 						 subnet_mask );
 	if ( ! NT_SUCCESS ( status ) )
@@ -397,79 +250,6 @@ static NTSTATUS store_tcpip_parameters ( PIBFT_NIC nic,
 }
 
 /**
- * Try to configure NIC from iBFT NIC structure
- *
- * @v nic		iBFT NIC structure
- * @v name		NDIS device name
- * @ret ntstatus	NT status
- */
-static NTSTATUS try_configure_nic ( PIBFT_NIC nic, PUNICODE_STRING name ) {
-	BOOLEAN must_disable;
-	PFILE_OBJECT file;
-	PDEVICE_OBJECT device;
-	UCHAR mac[6];
-	PDEVICE_OBJECT pdo;
-	LPWSTR netcfginstanceid;
-	NTSTATUS status;
-
-	/* Enable interface if not already done */
-	status = IoSetDeviceInterfaceState ( name, TRUE );
-	must_disable = ( NT_SUCCESS ( status ) ? TRUE : FALSE );
-
-	/* Get device and file object pointers */
-	status = IoGetDeviceObjectPointer ( name, FILE_ALL_ACCESS, &file,
-					    &device );
-	if ( ! NT_SUCCESS ( status ) ) {
-		/* Not an error, apparently; IoGetDeviceInterfaces()
-		 * seems to return a whole load of interfaces that
-		 * aren't attached to any objects.
-		 */
-		goto err_iogetdeviceobjectpointer;
-	}
-
-	/* See if NIC matches */
-	status = fetch_mac ( name, device, file, mac, sizeof ( mac ) );
-	if ( ! NT_SUCCESS ( status ) )
-		goto err_fetch_mac;
-	if ( memcmp ( nic->mac_address, mac, sizeof ( mac ) ) != 0 )
-		goto err_compare_mac;
-	DbgPrint ( "iBFT NIC %d is interface \"%wZ\"\n",
-		   nic->header.index, name );
-
-	/* Get matching PDO */
-	status = fetch_pdo ( name, device, &pdo );
-	if ( ! NT_SUCCESS ( status ) )
-		goto err_fetch_pdo;
-	DbgPrint ( "iBFT NIC %d is PDO %p\n", nic->header.index, pdo );
-
-	/* Get NetCfgInstanceId */
-	status = fetch_netcfginstanceid ( pdo, &netcfginstanceid );
-	if ( ! NT_SUCCESS ( status ) )
-		goto err_fetch_netcfginstanceid;
-	DbgPrint ( "iBFT NIC %d is NetCfgInstanceId \"%S\"\n",
-		   nic->header.index, netcfginstanceid );
-
-	/* Store registry values */
-	status = store_tcpip_parameters ( nic, netcfginstanceid );
-	if ( ! NT_SUCCESS ( status ) )
-		goto err_store_tcpip_parameters;
-
- err_store_tcpip_parameters:
-	ExFreePool ( netcfginstanceid );
- err_fetch_netcfginstanceid:
- err_fetch_pdo:
- err_compare_mac:
- err_fetch_mac:
-	/* Drop object reference */
-	ObDereferenceObject ( file );
- err_iogetdeviceobjectpointer:
-	/* Disable interface if we had to enable it */
-	if ( must_disable )
-		IoSetDeviceInterfaceState ( name, FALSE );
-	return status;
-}
-
-/**
  * Parse iBFT NIC structure
  *
  * @v ibft		iBFT
@@ -477,9 +257,6 @@ static NTSTATUS try_configure_nic ( PIBFT_NIC nic, PUNICODE_STRING name ) {
  */
 static VOID parse_ibft_nic ( PIBFT_TABLE ibft, PIBFT_NIC nic ) {
 	PIBFT_HEADER header = &nic->header;
-	PWSTR symlinks;
-	PWSTR symlink;
-	UNICODE_STRING u_symlink;
 	NTSTATUS status;
 
 	/* Dump structure information */
@@ -511,24 +288,15 @@ static VOID parse_ibft_nic ( PIBFT_TABLE ibft, PIBFT_NIC nic ) {
 		   ( ( nic->pci_bus_dev_func >> 0 ) & 0x07 ) );
 	DbgPrint ( "  Hostname = %s\n", ibft_string ( ibft, &nic->hostname ) );
 
-	/* Get list of all objects providing GUID_NDIS_LAN_CLASS interface */
-	status = IoGetDeviceInterfaces ( &GUID_NDIS_LAN_CLASS, NULL,
-					 DEVICE_INTERFACE_INCLUDE_NONACTIVE,
-					 &symlinks );
-	if ( ! NT_SUCCESS ( status ) ) {
-		DbgPrint ( "Could not fetch NIC list: %x\n", status );
-		return;
+	/* Try to configure NIC */
+	status = find_nic ( nic->mac_address, store_tcpip_parameters, nic );
+	if ( NT_SUCCESS ( status ) ) {
+		DbgPrint ( "Successfully configured iBFT NIC %d\n",
+			   header->index );
+	} else {
+		DbgPrint ( "Could not configure iBFT NIC %d: %x\n",
+			   header->index, status );
 	}
-
-	/* Configure any matching NICs */
-	for ( symlink = symlinks ;
-	      RtlInitUnicodeString ( &u_symlink, symlink ) , *symlink ;
-	      symlink += ( ( u_symlink.Length / sizeof ( *symlink ) ) + 1 ) ) {
-		try_configure_nic ( nic, &u_symlink );
-	}
-
-	/* Free object list */
-	ExFreePool ( symlinks );
 }
 
 /**
