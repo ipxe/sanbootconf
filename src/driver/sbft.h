@@ -139,6 +139,6 @@ typedef struct _SBFT_IB_SUBTABLE {
 } SBFT_IB_SUBTABLE, *PSBFT_IB_SUBTABLE;
 #pragma pack()
 
-extern VOID parse_sbft ( PSBFT_TABLE sbft );
+extern VOID parse_sbft ( PACPI_DESCRIPTION_HEADER acpi );
 
 #endif /* _SBFT_H */

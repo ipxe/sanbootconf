@@ -101,9 +101,10 @@ static VOID parse_sbft_ib ( PSBFT_TABLE sbft, PSBFT_IB_SUBTABLE ib ) {
 /**
  * Parse sBFT
  *
- * @v sbft		sBFT
+ * @v acpi		ACPI description header
  */
-VOID parse_sbft ( PSBFT_TABLE sbft ) {
+VOID parse_sbft ( PACPI_DESCRIPTION_HEADER acpi ) {
+	PSBFT_TABLE sbft = ( PSBFT_TABLE ) acpi;
 	PSBFT_SCSI_SUBTABLE scsi;
 	PSBFT_SRP_SUBTABLE srp;
 	PSBFT_IB_SUBTABLE ib;

@@ -31,9 +31,9 @@
 /** Device private data */
 typedef struct _SANBOOTCONF_PRIV {
 	/* Copy of iBFT, if any */
-	PIBFT_TABLE ibft;
+	PACPI_DESCRIPTION_HEADER ibft;
 	/* Copy of sBFT, if any */
-	PSBFT_TABLE sbft;
+	PACPI_DESCRIPTION_HEADER sbft;
 } SANBOOTCONF_PRIV, *PSANBOOTCONF_PRIV;
 
 /** Unique GUID for IoCreateDeviceSecure() */
@@ -77,6 +77,33 @@ static NTSTATUS sanbootconf_dummy_irp ( PDEVICE_OBJECT device, PIRP irp ) {
 }
 
 /**
+ * Fetch ACPI table copy
+ *
+ * @v signature		Table signature
+ * @v acpi		ACPI header
+ * @v buf		Buffer
+ * @v len		Length of buffer
+ * @ret ntstatus	NT status
+ */
+static NTSTATUS fetch_acpi_table_copy ( PCHAR signature,
+					PACPI_DESCRIPTION_HEADER acpi,
+					PCHAR buf, ULONG len ) {
+
+	DbgPrint ( "%s requested\n", signature );
+
+	if ( ! acpi ) {
+		DbgPrint ( "No %s available!\n", signature );
+		return STATUS_NO_SUCH_FILE;
+	}
+
+	if ( len > acpi->length )
+		len = acpi->length;
+	RtlCopyMemory ( buf, acpi, len );
+
+	return STATUS_SUCCESS;
+}
+
+/**
  * IoControl IRP handler
  *
  * @v device		Device object
@@ -86,35 +113,18 @@ static NTSTATUS sanbootconf_dummy_irp ( PDEVICE_OBJECT device, PIRP irp ) {
 static NTSTATUS sanbootconf_iocontrol_irp ( PDEVICE_OBJECT device, PIRP irp ) {
 	PIO_STACK_LOCATION irpsp = IoGetCurrentIrpStackLocation ( irp );
 	PSANBOOTCONF_PRIV priv = device->DeviceExtension;
+	PCHAR buf = irp->AssociatedIrp.SystemBuffer;
 	ULONG len = irpsp->Parameters.DeviceIoControl.OutputBufferLength;
 	NTSTATUS status;
 
 	switch ( irpsp->Parameters.DeviceIoControl.IoControlCode ) {
 	case IOCTL_SANBOOTCONF_IBFT:
-		DbgPrint ( "iBFT requested\n" );
-		if ( priv->ibft ) {
-			if ( len > priv->ibft->acpi.length )
-				len = priv->ibft->acpi.length;
-			RtlCopyMemory ( irp->AssociatedIrp.SystemBuffer,
-					priv->ibft, len );
-			status = STATUS_SUCCESS;
-		} else {
-			DbgPrint ( "No iBFT available!\n" );
-			status = STATUS_NO_SUCH_FILE;
-		}
+		status = fetch_acpi_table_copy ( IBFT_SIG, priv->ibft,
+						 buf, len );
 		break;
 	case IOCTL_SANBOOTCONF_SBFT:
-		DbgPrint ( "sBFT requested\n" );
-		if ( priv->sbft ) {
-			if ( len > priv->sbft->acpi.length )
-				len = priv->sbft->acpi.length;
-			RtlCopyMemory ( irp->AssociatedIrp.SystemBuffer,
-					priv->sbft, len );
-			status = STATUS_SUCCESS;
-		} else {
-			DbgPrint ( "No sbft available!\n" );
-			status = STATUS_NO_SUCH_FILE;
-		}
+		status = fetch_acpi_table_copy ( SBFT_SIG, priv->sbft,
+						 buf, len );
 		break;
 	default:
 		DbgPrint ( "Unrecognised IoControl %x\n",
@@ -261,7 +271,8 @@ static NTSTATUS check_system_disk ( PUNICODE_STRING name,
 					    &device );
 	if ( ! NT_SUCCESS ( status ) ) {
 		/* Most probably not yet attached */
-		DbgPrint ( "  Disk unavailable (%lx): \"%wZ\"\n", status, name );
+		DbgPrint ( "  Disk unavailable (%lx): \"%wZ\"\n",
+			   status, name );
 		goto err_iogetdeviceobjectpointer;
 	}
 
@@ -413,6 +424,30 @@ static VOID sanbootconf_wait ( PDRIVER_OBJECT driver, PVOID context,
 }
 
 /**
+ * Try to find ACPI table
+ *
+ * @v signature		Table signature
+ * @v parse		Table parser
+ * @ret table_copy	Copy of table, or NULL
+ * @ret found		Table was found
+ */
+static BOOLEAN try_find_acpi_table ( PCHAR signature,
+				     VOID ( *parse )
+					  ( PACPI_DESCRIPTION_HEADER acpi ),
+				     PACPI_DESCRIPTION_HEADER *table_copy ) {
+	NTSTATUS status;
+
+	status = find_acpi_table ( signature, table_copy );
+	if ( ! NT_SUCCESS ( status ) ) {
+		DbgPrint ( "No %s found\n", signature );
+		return FALSE;
+	}
+
+	parse ( *table_copy );
+	return TRUE;
+}
+
+/**
  * Driver entry point
  *
  * @v DriverObject	Driver object
@@ -423,9 +458,8 @@ NTSTATUS DriverEntry ( IN PDRIVER_OBJECT DriverObject,
 		       IN PUNICODE_STRING RegistryPath ) {
 	PDEVICE_OBJECT device;
 	PSANBOOTCONF_PRIV priv;
-	PACPI_DESCRIPTION_HEADER table;
 	NTSTATUS status;
-	BOOLEAN found_san = FALSE;
+	BOOLEAN found_san;
 
 	DbgPrint ( "SAN Boot Configuration Driver initialising\n" );
 
@@ -442,29 +476,10 @@ NTSTATUS DriverEntry ( IN PDRIVER_OBJECT DriverObject,
 		goto err_create_sanbootconf_device;
 	priv = device->DeviceExtension;
 
-	/* Look for an iBFT */
-	status = find_acpi_table ( IBFT_SIG, &table );
-	if ( NT_SUCCESS ( status ) ) {
-		priv->ibft = ( ( PIBFT_TABLE ) table );
-		parse_ibft ( priv->ibft );
-		found_san = TRUE;
-	} else {
-		/* Lack of an iBFT is not necessarily an error */
-		DbgPrint ( "No iBFT found\n" );
-		status = STATUS_SUCCESS;
-	}
-
-	/* Look for an sBFT */
-	status = find_acpi_table ( SBFT_SIG, &table );
-	if ( NT_SUCCESS ( status ) ) {
-		priv->sbft = ( ( PSBFT_TABLE ) table );
-		parse_sbft ( priv->sbft );
-		found_san = TRUE;
-	} else {
-		/* Lack of an sBFT is not necessarily an error */
-		DbgPrint ( "No sBFT found\n" );
-		status = STATUS_SUCCESS;
-	}
+	/* Look for boot firmware tables*/
+	found_san =
+		( try_find_acpi_table ( IBFT_SIG, parse_ibft, &priv->ibft ) |
+		  try_find_acpi_table ( SBFT_SIG, parse_sbft, &priv->sbft ) );
 
 	/* Wait for system disk, if booting from SAN */
 	if ( found_san ) {

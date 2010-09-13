@@ -584,9 +584,10 @@ static VOID parse_ibft_target ( PIBFT_TABLE ibft, PIBFT_TARGET target ) {
 /**
  * Parse iBFT
  *
- * @v ibft		iBFT
+ * @v acpi		ACPI description header
  */
-VOID parse_ibft ( PIBFT_TABLE ibft ) {
+VOID parse_ibft ( PACPI_DESCRIPTION_HEADER acpi ) {
+	PIBFT_TABLE ibft = ( PIBFT_TABLE ) acpi;
 	PIBFT_CONTROL control = &ibft->control;
 	PUSHORT offset;
 	PIBFT_HEADER header;
