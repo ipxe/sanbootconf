@@ -292,6 +292,9 @@ static NTSTATUS check_system_disk ( PUNICODE_STRING name,
 	status = fetch_partition_info ( name, device, file, &info );
 	if ( ! NT_SUCCESS ( status ) )
 		goto err_fetch_partition_info;
+
+	/* Check for a matching disk signature */
+	status = STATUS_UNSUCCESSFUL;
 	switch ( info.PartitionStyle ) {
 	case PARTITION_STYLE_MBR:
 		DbgPrint ( "  MBR %08lx: \"%wZ\"\n",
