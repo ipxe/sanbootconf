@@ -71,7 +71,7 @@ typedef struct _SBFT_TABLE {
 #pragma pack(1)
 typedef struct _SBFT_SCSI_SUBTABLE {
 	/** LUN */
-	ULONGLONG lun;
+	UCHAR lun[8];
 } SBFT_SCSI_SUBTABLE, *PSBFT_SCSI_SUBTABLE;
 #pragma pack()
 

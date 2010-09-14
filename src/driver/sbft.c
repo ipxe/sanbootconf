@@ -42,11 +42,9 @@
 static VOID parse_sbft_scsi ( PSBFT_TABLE sbft, PSBFT_SCSI_SUBTABLE scsi ) {
 
 	DbgPrint ( "Found sBFT SCSI subtable:\n" );
-	DbgPrint ( "  LUN = %04x-%04x-%04x-%04x\n",
-		   ( ( scsi->lun >> 48 ) & 0xffff ),
-		   ( ( scsi->lun >> 32 ) & 0xffff ),
-		   ( ( scsi->lun >> 16 ) & 0xffff ),
-		   ( ( scsi->lun >> 0  ) & 0xffff ) );
+	DbgPrint ( "  LUN = %02x%02x-%02x%02x-%02x%02x-%02x%02x\n",
+		   scsi->lun[0], scsi->lun[1], scsi->lun[2], scsi->lun[3],
+		   scsi->lun[4], scsi->lun[5], scsi->lun[6], scsi->lun[7] );
 	( VOID ) sbft;
 }
 

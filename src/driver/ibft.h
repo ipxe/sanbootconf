@@ -211,7 +211,7 @@ typedef struct _IBFT_TARGET {
 	/** TCP port */
 	USHORT socket;
 	/** Boot LUN */
-	ULONGLONG boot_lun;
+	UCHAR boot_lun[8];
 	/** CHAP type
 	 *
 	 * This is an IBFT_CHAP_XXX constant.

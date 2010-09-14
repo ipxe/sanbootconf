@@ -324,11 +324,11 @@ static VOID parse_ibft_target ( PIBFT_TABLE ibft, PIBFT_TARGET target ) {
 	DbgPrint ( "  IP = %s\n",
 		   ibft_ipaddr ( &target->ip_address ) );
 	DbgPrint ( "  Port = %d\n", target->socket );
-	DbgPrint ( "  LUN = %04x-%04x-%04x-%04x\n",
-		   ( ( target->boot_lun >> 48 ) & 0xffff ),
-		   ( ( target->boot_lun >> 32 ) & 0xffff ),
-		   ( ( target->boot_lun >> 16 ) & 0xffff ),
-		   ( ( target->boot_lun >> 0  ) & 0xffff ) );
+	DbgPrint ( "  LUN = %02x%02x-%02x%02x-%02x%02x-%02x%02x\n",
+		   target->boot_lun[0], target->boot_lun[1],
+		   target->boot_lun[2], target->boot_lun[3],
+		   target->boot_lun[4], target->boot_lun[5],
+		   target->boot_lun[6], target->boot_lun[7] );
 	DbgPrint ( "  CHAP type = %d (%s)\n", target->chap_type,
 		   ( ( target->chap_type == IBFT_CHAP_NONE ) ? "None" :
 		     ( ( target->chap_type == IBFT_CHAP_ONE_WAY ) ? "One-way" :
