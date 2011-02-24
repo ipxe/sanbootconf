@@ -4,7 +4,7 @@ Class = System
 ClassGUID = {4d36e97d-e325-11ce-bfc1-08002be10318}
 Provider = %fensys%
 CatalogFile = sanbootconf.cat
-DriverVer = 09/14/2010,0.9.8
+DriverVer = 02/24/2011,0.9.9
 
 [Manufacturer]
 %fensys% = FenSystems,ntx86,ntamd64
