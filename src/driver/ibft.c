@@ -93,6 +93,30 @@ static LPSTR ibft_ipaddr ( PIBFT_IPADDR ipaddr ) {
 }
 
 /**
+ * Convert subnet mask prefix to subnet mask
+ *
+ * @v prefix		Subnet mask prefix
+ * @ret mask		Subnet mask
+ */
+static ULONG ibft_subnet_mask ( UCHAR prefix ) {
+	return RtlUlongByteSwap ( 0xffffffffUL << ( 32 - prefix ) );
+}
+
+/**
+ * Fill in an IP address field within iBFT
+ *
+ * @v ipaddr		IP address field
+ * @v in		IPv4 address
+ */
+static void ibft_set_ipaddr ( PIBFT_IPADDR ipaddr, ULONG in ) {
+	memset ( ipaddr, 0, sizeof ( *ipaddr ) );
+	if ( in ) {
+		ipaddr->in = in;
+		ipaddr->ones = 0xffff;
+	}
+}
+
+/**
  * Parse iBFT initiator structure
  *
  * @v ibft		iBFT
@@ -217,8 +241,7 @@ static NTSTATUS store_tcpip_parameters ( PDEVICE_OBJECT pdo,
 		goto err_reg_store;
 
 	/* Store subnet mask */
-	subnet_mask = RtlUlongByteSwap ( 0xffffffffUL <<
-					 ( 32 - nic->subnet_mask_prefix ) );
+	subnet_mask = ibft_subnet_mask ( nic->subnet_mask_prefix );
 	status = store_ipv4_parameter_multi_sz ( reg_key, L"SubnetMask",
 						 subnet_mask );
 	if ( ! NT_SUCCESS ( status ) )
@@ -257,6 +280,7 @@ static NTSTATUS store_tcpip_parameters ( PDEVICE_OBJECT pdo,
  */
 static VOID parse_ibft_nic ( PIBFT_TABLE ibft, PIBFT_NIC nic ) {
 	PIBFT_HEADER header = &nic->header;
+	ULONG subnet_mask;
 	NTSTATUS status;
 
 	/* Dump structure information */
@@ -270,8 +294,9 @@ static VOID parse_ibft_nic ( PIBFT_TABLE ibft, PIBFT_NIC nic ) {
 		     ? ", global address" : ", link local address" ) );
 	if ( ! ( header->flags & IBFT_FL_NIC_BLOCK_VALID ) )
 		return;
-	DbgPrint ( "  IP = %s/%d\n", ibft_ipaddr ( &nic->ip_address ),
-		   nic->subnet_mask_prefix );
+	DbgPrint ( "  IP = %s/", ibft_ipaddr ( &nic->ip_address ) );
+	subnet_mask = ibft_subnet_mask ( nic->subnet_mask_prefix );
+	DbgPrint ( "%s\n", inet_ntoa ( subnet_mask ) );
 	DbgPrint ( "  Origin = %d\n", nic->origin );
 	DbgPrint ( "  Gateway = %s\n", ibft_ipaddr ( &nic->gateway ) );
 	DbgPrint ( "  DNS = %s", ibft_ipaddr ( &nic->dns[0] ) );
@@ -350,41 +375,102 @@ static VOID parse_ibft_target ( PIBFT_TABLE ibft, PIBFT_TARGET target ) {
 }
 
 /**
+ * Iterate over entries in the iBFT
+ *
+ * @v entry		Structure
+ * @v TYPE		Type of structure
+ * @v ibft		iBFT
+ * @v offset		Loop counter
+ */
+#define for_each_ibft_entry( entry, TYPE, ibft, offset )		      \
+	for ( offset = &ibft->control.extensions,			      \
+	      entry = ( ( PIBFT_ ## TYPE ) ( ( ( PUCHAR ) ibft ) + *offset ));\
+	      ( ( PUCHAR ) offset ) < ( ( ( PUCHAR ) &ibft->control ) +	      \
+					ibft->control.header.length ) ;	      \
+	      offset++,							      \
+	      entry = ( ( PIBFT_ ## TYPE ) ( ( ( PUCHAR ) ibft ) + *offset )))\
+		if ( ( *offset == 0 ) ||				      \
+		     ( entry->header.structure_id !=			      \
+		       IBFT_STRUCTURE_ID_ ## TYPE ) ) continue;		      \
+		else
+
+/**
  * Parse iBFT
  *
  * @v acpi		ACPI description header
  */
 VOID parse_ibft ( PACPI_DESCRIPTION_HEADER acpi ) {
 	PIBFT_TABLE ibft = ( PIBFT_TABLE ) acpi;
-	PIBFT_CONTROL control = &ibft->control;
-	PUSHORT offset;
-	PIBFT_HEADER header;
+	PUSHORT initiator_offset;
+	PIBFT_INITIATOR initiator;
+	PUSHORT nic_offset;
+	PIBFT_NIC nic;
+	PUSHORT target_offset;
+	PIBFT_TARGET target;
+	ULONG gateway;
+	ULONG network;
+	ULONG netmask;
+	ULONG attached_targets;
 
-	/* Scan through all entries in the Control structure */
-	for ( offset = &control->extensions ;
-	      ( ( PUCHAR ) offset ) <
-		      ( ( ( PUCHAR ) control ) + control->header.length ) ;
-	      offset++ ) {
-		if ( ! *offset )
+	/* Scan through all iBFT entries */
+	for_each_ibft_entry ( initiator, INITIATOR, ibft, initiator_offset )
+		parse_ibft_initiator ( ibft, initiator );
+	for_each_ibft_entry ( nic, NIC, ibft, nic_offset )
+		parse_ibft_nic ( ibft, nic );
+	for_each_ibft_entry ( target, TARGET, ibft, target_offset )
+		parse_ibft_target ( ibft, target );
+
+	/* If a gateway is specified in the iBFT, the Microsoft iSCSI
+	 * initiator will create a static route to the iSCSI target
+	 * via that gateway.  (See the knowledge base article at
+	 * http://support.microsoft.com/kb/960104 for details.)  If
+	 * the target is in the same subnet then this is undesirable,
+	 * since it will mean duplicating every outbound packet on the
+	 * network.
+	 *
+	 * We work around this by replacing the gateway address as
+	 * follows:
+	 *
+	 *    a) if no targets are directly attached to this NIC's
+	 *       subnet, we leave the gateway address as-is,
+	 *
+	 *    b) if exactly one target is directly attached to this
+	 *       NIC's subnet, we set the gateway address to the
+	 *       target's own IP address, thus giving a target-
+	 *       specific route that will remain correct even if the
+	 *       subnet route is later removed.
+	 *
+	 *    c) if more than one target is directly attached to this
+	 *       NIC's subnet, we blank out the gateway address, thus
+	 *       preventing the creation of the undesirable routes.
+	 *
+	 * Note that none of this affects the normal TCP/IP stack
+	 * configuration, which has already been carried out; this
+	 * affects only the dedicated routes created by the Microsoft
+	 * iSCSI initiator.
+	 */
+	for_each_ibft_entry ( nic, NIC, ibft, nic_offset ) {
+		gateway = nic->gateway.in;
+		if ( ! gateway )
 			continue;
-		header = ( ( PIBFT_HEADER ) ( ( ( PUCHAR ) ibft ) + *offset ));
-		switch ( header->structure_id ) {
-		case IBFT_STRUCTURE_ID_INITIATOR :
-			parse_ibft_initiator ( ibft,
-					       ( ( PIBFT_INITIATOR ) header ));
-			break;
-		case IBFT_STRUCTURE_ID_NIC :
-			parse_ibft_nic ( ibft, ( ( PIBFT_NIC ) header ) );
-			break;
-		case IBFT_STRUCTURE_ID_TARGET :
-			parse_ibft_target ( ibft,
-					    ( ( PIBFT_TARGET ) header ) );
-			break;
-		default :
-			DbgPrint ( "Ignoring unknown iBFT structure ID %d "
-				   "index %d\n", header->structure_id,
-				   header->index );
-			break;
+		netmask = ibft_subnet_mask ( nic->subnet_mask_prefix );
+		network = ( nic->ip_address.in & netmask );
+		attached_targets = 0;
+		for_each_ibft_entry ( target, TARGET, ibft, target_offset ) {
+			if ( ( target->ip_address.in & netmask ) != network )
+				continue;
+			gateway = ( ( attached_targets == 0 ) ?
+				    target->ip_address.in : 0 );
+			attached_targets++;
+		}
+		DbgPrint ( "Found %d target(s) directly attached via iBFT NIC "
+			   "%d\n", attached_targets, nic->header.index );
+		if ( gateway != nic->gateway.in ) {
+			DbgPrint ( "Amending gateway for iBFT NIC %d from %s",
+				   nic->header.index,
+				   ibft_ipaddr ( &nic->gateway ) );
+			ibft_set_ipaddr ( &nic->gateway, gateway );
+			DbgPrint ( " to %s\n", ibft_ipaddr ( &nic->gateway ) );
 		}
 	}
 }
