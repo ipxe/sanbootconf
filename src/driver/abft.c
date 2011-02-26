@@ -21,6 +21,7 @@
 #include <ntddk.h>
 #include <ntstrsafe.h>
 #include "sanbootconf.h"
+#include "boottext.h"
 #include "nic.h"
 #include "abft.h"
 
@@ -52,6 +53,12 @@ VOID parse_abft ( PACPI_DESCRIPTION_HEADER acpi ) {
 	DbgPrint ( "Found aBFT NIC %02x:%02x:%02x:%02x:%02x:%02x\n",
 		   abft->mac[0], abft->mac[1], abft->mac[2],
 		   abft->mac[3], abft->mac[4], abft->mac[5] );
+
+	/* Print compressed information on boot splash screen */
+	BootPrint ( "NIC %02x:%02x:%02x:%02x:%02x:%02x target e%d.%d\n",
+		    abft->mac[0], abft->mac[1], abft->mac[2],
+		    abft->mac[3], abft->mac[4], abft->mac[5],
+		    abft->shelf, abft->slot );
 
 	/* Check for existence of NIC */
 	status = find_nic ( abft->mac, abft_dummy, NULL );

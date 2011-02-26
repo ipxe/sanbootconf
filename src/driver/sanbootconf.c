@@ -25,6 +25,7 @@
 #include "ibft.h"
 #include "sbft.h"
 #include "abft.h"
+#include "boottext.h"
 
 /** Maximum time to wait for system disk, in seconds */
 #define SANBOOTCONF_MAX_WAIT 120
@@ -442,23 +443,37 @@ static VOID sanbootconf_wait ( PDRIVER_OBJECT driver, PVOID context,
  * Try to find ACPI table
  *
  * @v signature		Table signature
+ * @v label		Label for boot message
  * @v parse		Table parser
  * @ret table_copy	Copy of table, or NULL
  * @ret found		Table was found
  */
-static BOOLEAN try_find_acpi_table ( PCHAR signature,
+static BOOLEAN try_find_acpi_table ( PCHAR signature, PCHAR label,
 				     VOID ( *parse )
 					  ( PACPI_DESCRIPTION_HEADER acpi ),
 				     PACPI_DESCRIPTION_HEADER *table_copy ) {
+	PACPI_DESCRIPTION_HEADER table;
 	NTSTATUS status;
 
+	/* Try to find table */
 	status = find_acpi_table ( signature, table_copy );
 	if ( ! NT_SUCCESS ( status ) ) {
 		DbgPrint ( "No %s found\n", signature );
 		return FALSE;
 	}
+	table = *table_copy;
 
-	parse ( *table_copy );
+	/* Inform user that we are attempting a SAN boot */
+	BootPrint ( "%s boot via %.8s\n", label, table->oem_table_id );
+	/* Warn about use of unsupported software */
+	if ( strcmp ( table->oem_table_id, "gPXE" ) == 0 ) {
+		BootPrint ( "WARNING: gPXE is no longer supported; "
+			    "please upgrade to iPXE (http://ipxe.org)\n" );
+	}
+
+	/* Parse table */
+	parse ( table );
+
 	return TRUE;
 }
 
@@ -493,9 +508,12 @@ NTSTATUS DriverEntry ( IN PDRIVER_OBJECT DriverObject,
 
 	/* Look for boot firmware tables*/
 	found_san =
-		( try_find_acpi_table ( IBFT_SIG, parse_ibft, &priv->ibft ) |
-		  try_find_acpi_table ( ABFT_SIG, parse_abft, &priv->abft ) |
-		  try_find_acpi_table ( SBFT_SIG, parse_sbft, &priv->sbft ) );
+		( try_find_acpi_table ( IBFT_SIG, "iSCSI",
+					parse_ibft, &priv->ibft ) |
+		  try_find_acpi_table ( ABFT_SIG, "AoE",
+					parse_abft, &priv->abft ) |
+		  try_find_acpi_table ( SBFT_SIG, "SRP",
+					parse_sbft, &priv->sbft ) );
 
 	/* Wait for system disk, if booting from SAN */
 	if ( found_san ) {

@@ -26,6 +26,7 @@
 #include <ndisguid.h>
 #include <ntddndis.h>
 #include "sanbootconf.h"
+#include "boottext.h"
 #include "registry.h"
 #include "nic.h"
 
@@ -288,7 +289,7 @@ NTSTATUS find_nic ( PUCHAR mac,
 					 DEVICE_INTERFACE_INCLUDE_NONACTIVE,
 					 &symlinks );
 	if ( ! NT_SUCCESS ( status ) ) {
-		DbgPrint ( "Could not fetch NIC list: %x\n", status );
+		BootPrint ( "Could not fetch NIC list: %x\n", status );
 		return status;
 	}
 
@@ -301,6 +302,8 @@ NTSTATUS find_nic ( PUCHAR mac,
 			goto done;
 	}
 	status = STATUS_NO_SUCH_FILE;
+	BootPrint ( "ERROR: %02x:%02x:%02x:%02x:%02x:%02x not found\n",
+		    mac[0], mac[1], mac[2], mac[3], mac[4], mac[5] );
 
  done:
 	/* Free object list */

@@ -86,12 +86,6 @@ NTSTATUS find_acpi_table ( PCHAR signature,
 			   "\"%.6s\" OEM table ID \"%.8s\"\n", signature,
 			   ( BASEMEM_START + offset ), table->oem_id,
 			   table->oem_table_id );
-		/* Warn about use of unsupported software */
-		if ( strcmp ( table->oem_table_id, "gPXE" ) == 0 ) {
-			DbgPrint ( "*** WARNING: gPXE is no longer supported; "
-				   "please upgrade to iPXE (http://ipxe.org) "
-				   "***\n" );
-		}
 		/* Create copy of table */
 		*table_copy = ExAllocatePoolWithTag ( NonPagedPool,
 						      table->length,

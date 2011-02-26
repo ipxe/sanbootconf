@@ -22,6 +22,7 @@
 #include <ntddk.h>
 #include <ntstrsafe.h>
 #include "sanbootconf.h"
+#include "boottext.h"
 #include "registry.h"
 #include "nic.h"
 #include "ibft.h"
@@ -141,6 +142,9 @@ static VOID parse_ibft_initiator ( PIBFT_TABLE ibft,
 	DbgPrint ( ", %s\n", ibft_ipaddr ( &initiator->radius[1] ) );
 	DbgPrint ( "  Name = %s\n",
 		   ibft_string ( ibft, &initiator->initiator_name ) );
+
+	/* Print compressed information on boot splash screen */
+	BootPrint ( "%s\n", ibft_string ( ibft, &initiator->initiator_name ) );
 }
 
 /**
@@ -313,6 +317,15 @@ static VOID parse_ibft_nic ( PIBFT_TABLE ibft, PIBFT_NIC nic ) {
 		   ( ( nic->pci_bus_dev_func >> 0 ) & 0x07 ) );
 	DbgPrint ( "  Hostname = %s\n", ibft_string ( ibft, &nic->hostname ) );
 
+	/* Print compressed information on boot splash screen */
+	BootPrint ( "%02x:%02x:%02x:%02x:%02x:%02x %s/",
+		    nic->mac_address[0], nic->mac_address[1],
+		    nic->mac_address[2], nic->mac_address[3],
+		    nic->mac_address[4], nic->mac_address[5],
+		    ibft_ipaddr ( &nic->ip_address ) );
+	BootPrint ( "%s", inet_ntoa ( subnet_mask ) );
+	BootPrint ( " gw %s\n", ibft_ipaddr ( &nic->gateway ) );
+
 	/* Try to configure NIC */
 	status = find_nic ( nic->mac_address, store_tcpip_parameters, nic );
 	if ( NT_SUCCESS ( status ) ) {
@@ -372,6 +385,10 @@ static VOID parse_ibft_target ( PIBFT_TABLE ibft, PIBFT_TARGET target ) {
 	DbgPrint ( "  Reverse CHAP secret = %s\n",
 		   ( ibft_string_exists ( &target->reverse_chap_secret ) ?
 		     "<omitted>" : "" ) );
+
+	/* Print compressed information on boot splash screen */
+	BootPrint ( "%s %s\n", ibft_ipaddr ( &target->ip_address ),
+		    ibft_string ( ibft, &target->target_name ) );
 }
 
 /**
