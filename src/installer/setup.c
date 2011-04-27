@@ -288,7 +288,7 @@ static LONG set_boot_start_nics ( void ) {
 
 	/* Get NIC list */
 	dev_info_list = SetupDiGetClassDevs ( &GUID_DEVCLASS_NET, NULL,
-					      NULL, DIGCF_PRESENT );
+					      NULL, 0 );
 	if ( dev_info_list == INVALID_HANDLE_VALUE ) {
 		err = GetLastError();
 		eprintf ( "Could not get NIC list: %x\n", err );
@@ -336,26 +336,28 @@ static LONG set_boot_start_nics ( void ) {
 							   sizeof ( service ),
 							   NULL ) ) {
 			err = GetLastError();
-			eprintf ( "Could not get service name: %x\n", err );
+			eprintf ( "Could not get service name for \"%S\": "
+				  "%x\n", name, err );
 			goto err_setupdigetdeviceregistryproperty;
 		}
 
-		/* See if this is a hidden device */
+		/* Skip if this is a hidden device, or if we cannot
+		 * retrieve a device status.  This is something of a
+		 * heuristic.  It's a fairly safe bet that anything
+		 * showing up as non-hidden is a real NIC; the
+		 * remainder tend to be "WAN Miniport" devices et al.,
+		 * which will crash if set as boot-start.
+		 */
 		err = CM_Get_DevNode_Status ( &status, &problem,
 					      dev_info.DevInst, 0 );
 		if ( err != CR_SUCCESS ) {
-			eprintf ( "Could not get device status: %x\n", err );
-			goto err_cm_get_devnode_status;
-		}
-
-		/* Skip if this is a hidden device.  This is something
-		 * of a heuristic.  It's a fairly safe bet that
-		 * anything showing up as non-hidden is a real NIC;
-		 * the remainder tend to be "WAN Miniport" devices et
-		 * al., which will crash if set as boot-start.
-		 */
-		if ( status & DN_NO_SHOW_IN_DM )
+			eprintf ( "Skipping unknown NIC \"%S\"\n", name );
 			continue;
+		}
+		if ( status & DN_NO_SHOW_IN_DM ) {
+			eprintf ( "Skipping hidden NIC \"%S\"\n", name );
+			continue;
+		}
 
 		printf ( "Found NIC \"%S\"\n", name );
 
@@ -369,7 +371,6 @@ static LONG set_boot_start_nics ( void ) {
 	err = 0;
 
  err_set_boot_start:
- err_cm_get_devnode_status:
  err_setupdigetdeviceregistryproperty:
  err_setupdienumdeviceinfo:
 	SetupDiDestroyDeviceInfoList ( dev_info_list );
