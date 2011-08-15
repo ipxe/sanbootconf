@@ -45,6 +45,10 @@ StartType = 0x0
 LoadOrderGroup = Base
 ErrorControl = 0x1
 ServiceBinary = %12%\sanbootconf.sys
+AddReg = ServiceAddReg
+
+[ServiceAddReg]
+HKR,Parameters,BootText,0x00010003,0x00000001
 
 [Strings]
 fensys = "Fen Systems Ltd."
