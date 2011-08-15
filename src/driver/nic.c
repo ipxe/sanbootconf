@@ -166,12 +166,12 @@ static NTSTATUS fetch_netcfginstanceid ( PDEVICE_OBJECT pdo,
 	}
 
 	/* Read NetCfgInstanceId value */
-	status = fetch_reg_sz ( reg_key, L"NetCfgInstanceId",
+	status = reg_fetch_sz ( reg_key, L"NetCfgInstanceId",
 				netcfginstanceid );
 	if ( ! NT_SUCCESS ( status ) )
-		goto err_fetch_reg_wstr;
+		goto err_reg_fetch_wstr;
 
- err_fetch_reg_wstr:
+ err_reg_fetch_wstr:
 	ZwClose ( reg_key );
  err_ioopendeviceregistrykey:
 	return status;

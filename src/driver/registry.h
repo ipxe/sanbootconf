@@ -21,11 +21,11 @@
 
 extern NTSTATUS reg_open ( LPCWSTR reg_key_name, PHANDLE reg_key );
 extern VOID reg_close ( HANDLE reg_key );
-extern NTSTATUS fetch_reg_kvi ( HANDLE reg_key, LPCWSTR value_name,
+extern NTSTATUS reg_fetch_kvi ( HANDLE reg_key, LPCWSTR value_name,
 				PKEY_VALUE_PARTIAL_INFORMATION *kvi );
-extern NTSTATUS fetch_reg_sz ( HANDLE reg_key, LPCWSTR value_name,
+extern NTSTATUS reg_fetch_sz ( HANDLE reg_key, LPCWSTR value_name,
 			       LPWSTR *value );
-extern NTSTATUS fetch_reg_multi_sz ( HANDLE reg_key, LPCWSTR value_name,
+extern NTSTATUS reg_fetch_multi_sz ( HANDLE reg_key, LPCWSTR value_name,
 				     LPWSTR **values );
 extern NTSTATUS reg_store_sz ( HANDLE reg_key, LPCWSTR value_name,
 			       LPWSTR value );

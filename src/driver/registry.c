@@ -66,7 +66,7 @@ VOID reg_close ( HANDLE reg_key ) {
  * The caller must eventually free the allocated key value information
  * block.
  */
-NTSTATUS fetch_reg_kvi ( HANDLE reg_key, LPCWSTR value_name,
+NTSTATUS reg_fetch_kvi ( HANDLE reg_key, LPCWSTR value_name,
 			 PKEY_VALUE_PARTIAL_INFORMATION *kvi ) {
 	UNICODE_STRING u_value_name;
 	ULONG kvi_len;
@@ -123,15 +123,15 @@ NTSTATUS fetch_reg_kvi ( HANDLE reg_key, LPCWSTR value_name,
  *
  * The caller must eventually free the allocated value.
  */
-NTSTATUS fetch_reg_sz ( HANDLE reg_key, LPCWSTR value_name, LPWSTR *value ) {
+NTSTATUS reg_fetch_sz ( HANDLE reg_key, LPCWSTR value_name, LPWSTR *value ) {
 	PKEY_VALUE_PARTIAL_INFORMATION kvi;
 	ULONG value_len;
 	NTSTATUS status;
 
 	/* Fetch key value information */
-	status = fetch_reg_kvi ( reg_key, value_name, &kvi );
+	status = reg_fetch_kvi ( reg_key, value_name, &kvi );
 	if ( ! NT_SUCCESS ( status ) )
-		goto err_fetch_reg_kvi;
+		goto err_reg_fetch_kvi;
 
 	/* Allocate and populate string */
 	value_len = ( kvi->DataLength + sizeof ( value[0] ) );
@@ -148,7 +148,7 @@ NTSTATUS fetch_reg_sz ( HANDLE reg_key, LPCWSTR value_name, LPWSTR *value ) {
 
  err_exallocatepoolwithtag_value:
 	ExFreePool ( kvi );
- err_fetch_reg_kvi:
+ err_reg_fetch_kvi:
 	return status;
 }
 
@@ -162,7 +162,7 @@ NTSTATUS fetch_reg_sz ( HANDLE reg_key, LPCWSTR value_name, LPWSTR *value ) {
  *
  * The caller must eventually free the allocated values.
  */
-NTSTATUS fetch_reg_multi_sz ( HANDLE reg_key, LPCWSTR value_name,
+NTSTATUS reg_fetch_multi_sz ( HANDLE reg_key, LPCWSTR value_name,
 			      LPWSTR **values ) {
 	PKEY_VALUE_PARTIAL_INFORMATION kvi;
 	LPWSTR string;
@@ -172,9 +172,9 @@ NTSTATUS fetch_reg_multi_sz ( HANDLE reg_key, LPCWSTR value_name,
 	NTSTATUS status;
 
 	/* Fetch key value information */
-	status = fetch_reg_kvi ( reg_key, value_name, &kvi );
+	status = reg_fetch_kvi ( reg_key, value_name, &kvi );
 	if ( ! NT_SUCCESS ( status ) )
-		goto err_fetch_reg_kvi;
+		goto err_reg_fetch_kvi;
 
 	/* Count number of strings in the array.  This is a
 	 * potential(ly harmless) overestimate.
@@ -211,7 +211,7 @@ NTSTATUS fetch_reg_multi_sz ( HANDLE reg_key, LPCWSTR value_name,
 
  err_exallocatepoolwithtag_value:
 	ExFreePool ( kvi );
- err_fetch_reg_kvi:
+ err_reg_fetch_kvi:
 	return status;
 }
 
