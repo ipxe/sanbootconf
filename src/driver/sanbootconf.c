@@ -25,6 +25,7 @@
 #include "ibft.h"
 #include "sbft.h"
 #include "abft.h"
+#include "registry.h"
 #include "boottext.h"
 
 /** Maximum time to wait for system disk, in seconds */
@@ -67,6 +68,41 @@ static const PWCHAR sanbootconf_device_symlink[] = {
 	L"\\Device\\iSCSIBoot",
 	L"\\DosDevices\\iSCSIBoot",
 };
+
+/**
+ * Load driver parameters
+ *
+ * @v key_name		Driver key name
+ * @ret ntstatus	NT status
+ */
+static NTSTATUS load_parameters ( LPCWSTR key_name ) {
+	HANDLE reg_key;
+	ULONG boottext;
+	NTSTATUS status;
+
+	/* Open Parameters key */
+	status = reg_open ( &reg_key, key_name, L"Parameters", NULL );
+	if ( ! NT_SUCCESS ( status ) ) {
+		DbgPrint ( "Could not open Parameters key: %x\n", status );
+		goto err_reg_open;
+	}
+
+	/* Retrieve BootText parameter */
+	status = reg_fetch_dword ( reg_key, L"BootText", &boottext );
+	if ( NT_SUCCESS ( status ) ) {
+		boottext_enabled = ( ( boottext != 0 ) ? TRUE : FALSE );
+		DbgPrint ( "Boot screen text is %s\n",
+			   ( boottext_enabled ? "enabled" : "disabled" ) );
+	} else {
+		DbgPrint ( "Could not read BootText parameter: %x\n", status );
+		/* Treat as non-fatal error */
+		status = STATUS_SUCCESS;
+	}
+
+	reg_close ( reg_key );
+ err_reg_open:
+	return status;
+}
 
 /**
  * Dummy IRP handler
@@ -492,6 +528,14 @@ NTSTATUS DriverEntry ( IN PDRIVER_OBJECT DriverObject,
 	BOOLEAN found_san;
 
 	DbgPrint ( "SAN Boot Configuration Driver initialising\n" );
+
+	/* Load driver parameters */
+	status = load_parameters ( RegistryPath->Buffer );
+	if ( ! NT_SUCCESS ( status ) ) {
+		/* Treat as non-fatal error */
+		DbgPrint ( "Could not load parameters: %x\n", status );
+		status = STATUS_SUCCESS;
+	}
 
 	/* Hook in driver methods */
 	DriverObject->MajorFunction[IRP_MJ_CREATE] = sanbootconf_dummy_irp;
