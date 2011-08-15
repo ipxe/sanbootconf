@@ -19,7 +19,7 @@
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
-extern NTSTATUS reg_open ( LPCWSTR reg_key_name, PHANDLE reg_key );
+extern NTSTATUS reg_open ( PHANDLE reg_key, ... );
 extern VOID reg_close ( HANDLE reg_key );
 extern NTSTATUS reg_fetch_kvi ( HANDLE reg_key, LPCWSTR value_name,
 				PKEY_VALUE_PARTIAL_INFORMATION *kvi );

@@ -24,26 +24,62 @@
 /**
  * Open registry key
  *
- * @v reg_key_name	Registry key name
  * @v reg_key		Registry key to fill in
+ * @v ...		Registry key name components, terminated with a NULL
  * @ret ntstatus	NT status
  */
-NTSTATUS reg_open ( LPCWSTR reg_key_name, PHANDLE reg_key ) {
+NTSTATUS reg_open ( PHANDLE reg_key, ... ) {
 	UNICODE_STRING unicode_string;
 	OBJECT_ATTRIBUTES object_attrs;
+	va_list args;
+	LPCWSTR key_name_part;
+	LPWSTR key_name;
+	SIZE_T key_name_len;
 	NTSTATUS status;
 
-	RtlInitUnicodeString ( &unicode_string, reg_key_name );
+	/* Calculate total buffer length */
+	key_name_len = 0;
+	va_start ( args, reg_key );
+	while ( ( key_name_part = va_arg ( args, LPCWSTR ) ) != NULL ) {
+		key_name_len += ( ( wcslen ( key_name_part ) + 1 ) *
+				  sizeof ( key_name_part[0] ) );
+	}
+	va_end ( args );
+
+	/* Allocate buffer */
+	key_name = ExAllocatePoolWithTag ( NonPagedPool, key_name_len,
+					   SANBOOTCONF_POOL_TAG );
+	if ( ! key_name ) {
+		DbgPrint ( "Could not allocate key name buffer\n" );
+		status = STATUS_UNSUCCESSFUL;
+		goto err_exallocatepoolwithtag;
+	}
+
+	/* Create key name */
+	va_start ( args, reg_key );
+	key_name[0] = 0;
+	while ( ( key_name_part = va_arg ( args, LPCWSTR ) ) != NULL ) {
+		if ( key_name[0] )
+			RtlStringCbCatW ( key_name, key_name_len, L"\\" );
+		RtlStringCbCatW ( key_name, key_name_len, key_name_part );
+	}
+	va_end ( args );
+
+	/* Open key */
+	RtlInitUnicodeString ( &unicode_string, key_name );
 	InitializeObjectAttributes ( &object_attrs, &unicode_string,
 				     OBJ_KERNEL_HANDLE | OBJ_CASE_INSENSITIVE,
 				     NULL, NULL );
 	status = ZwOpenKey ( reg_key, KEY_ALL_ACCESS, &object_attrs );
 	if ( ! NT_SUCCESS ( status ) ) {
-		DbgPrint ( "Could not open %S: %x\n", reg_key_name, status );
-		return status;
+		DbgPrint ( "Could not open %S: %x\n", key_name, status );
+		goto err_zwopenkey;
 	}
 
-	return STATUS_SUCCESS;
+ err_zwopenkey:
+	ExFreePool ( key_name );
+ err_exallocatepoolwithtag:
+	return status;
 }
 
 /**

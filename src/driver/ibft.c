@@ -209,32 +209,14 @@ static NTSTATUS store_tcpip_parameters ( PDEVICE_OBJECT pdo,
 					 PVOID opaque ) {
 	LPCWSTR key_name_prefix = ( L"\\Registry\\Machine\\SYSTEM\\"
 				    L"CurrentControlSet\\Services\\"
-				    L"Tcpip\\Parameters\\Interfaces\\" );
+				    L"Tcpip\\Parameters\\Interfaces" );
 	PIBFT_NIC nic = opaque;
-	LPWSTR key_name;
-	SIZE_T key_name_len;
 	HANDLE reg_key;
 	ULONG subnet_mask;
 	NTSTATUS status;
 
-	/* Allocate key name */
-	key_name_len = ( ( wcslen ( key_name_prefix ) +
-			   wcslen ( netcfginstanceid ) + 1 ) *
-			 sizeof ( key_name[0] ) );
-	key_name = ExAllocatePoolWithTag ( NonPagedPool, key_name_len,
-					   SANBOOTCONF_POOL_TAG );
-	if ( ! key_name ) {
-		DbgPrint ( "Could not allocate TCP/IP key name\n" );
-		status = STATUS_UNSUCCESSFUL;
-		goto err_exallocatepoolwithtag;
-	}
-
-	/* Construct key name */
-	RtlStringCbCopyW ( key_name, key_name_len, key_name_prefix );
-	RtlStringCbCatW ( key_name, key_name_len, netcfginstanceid );
-
 	/* Open key */
-	status = reg_open ( key_name, &reg_key );
+	status = reg_open ( &reg_key, key_name_prefix, netcfginstanceid, NULL );
 	if ( ! NT_SUCCESS ( status ) )
 		goto err_reg_open;
 
@@ -271,8 +253,6 @@ static NTSTATUS store_tcpip_parameters ( PDEVICE_OBJECT pdo,
  err_reg_store:
 	reg_close ( reg_key );
  err_reg_open:
-	ExFreePool ( key_name );
- err_exallocatepoolwithtag:
 	return status;
 }
 
