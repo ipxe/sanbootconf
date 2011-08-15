@@ -27,6 +27,8 @@ extern NTSTATUS reg_fetch_sz ( HANDLE reg_key, LPCWSTR value_name,
 			       LPWSTR *value );
 extern NTSTATUS reg_fetch_multi_sz ( HANDLE reg_key, LPCWSTR value_name,
 				     LPWSTR **values );
+extern NTSTATUS reg_fetch_dword ( HANDLE reg_key, LPCWSTR value_name,
+				  ULONG *value );
 extern NTSTATUS reg_store_sz ( HANDLE reg_key, LPCWSTR value_name,
 			       LPWSTR value );
 extern NTSTATUS reg_store_multi_sz ( HANDLE reg_key, LPCWSTR value_name, ... );

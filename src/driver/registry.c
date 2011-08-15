@@ -252,6 +252,40 @@ NTSTATUS reg_fetch_multi_sz ( HANDLE reg_key, LPCWSTR value_name,
 }
 
 /**
+ * Fetch registry dword value
+ *
+ * @v reg_key		Registry key
+ * @v value_name	Registry value name
+ * @v value		Dword value to fill in
+ * @ret ntstatus	NT status
+ */
+NTSTATUS reg_fetch_dword ( HANDLE reg_key, LPCWSTR value_name, ULONG *value ) {
+	PKEY_VALUE_PARTIAL_INFORMATION kvi;
+	NTSTATUS status;
+
+	/* Fetch key value information */
+	status = reg_fetch_kvi ( reg_key, value_name, &kvi );
+	if ( ! NT_SUCCESS ( status ) )
+		goto err_reg_fetch_kvi;
+
+	/* Sanity check */
+	if ( kvi->DataLength != sizeof ( *value ) ) {
+		DbgPrint ( "Bad size %x for dword \"%S\"\n",
+			   kvi->DataLength, value_name );
+		status = STATUS_UNSUCCESSFUL;
+		goto err_datalength;
+	}
+
+	/* Copy value */
+	RtlCopyMemory ( value, kvi->Data, sizeof ( *value ) );
+
+ err_datalength:
+	ExFreePool ( kvi );
+ err_reg_fetch_kvi:
+	return status;
+}
+
+/**
  * Store registry string value
  *
  * @v reg_key		Registry key
@@ -348,7 +382,7 @@ NTSTATUS reg_store_multi_sz ( HANDLE reg_key, LPCWSTR value_name, ... ) {
  *
  * @v reg_key		Registry key
  * @v value_name	Registry value name
- * @v value		String value to store, or NULL
+ * @v value		Dword value to store
  * @ret ntstatus	NT status
  */
 NTSTATUS reg_store_dword ( HANDLE reg_key, LPCWSTR value_name, ULONG value ) {
