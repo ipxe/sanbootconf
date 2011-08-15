@@ -19,6 +19,8 @@
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
+extern BOOLEAN boottext_enabled;
+
 extern VOID BootPrint ( const char *fmt, ... );
 
 #endif /* _BOOTTEXT_H */

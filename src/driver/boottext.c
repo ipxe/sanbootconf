@@ -62,6 +62,9 @@ VOID NTAPI InbvSolidColorFill ( IN ULONG Left, IN ULONG Top, IN ULONG Width,
 				IN ULONG Height, IN ULONG Color );
 VOID NTAPI InbvSetProgressBarSubset ( IN ULONG Floor, IN ULONG Ceiling );
 
+/** Boot text is enabled */
+BOOLEAN boottext_enabled = TRUE;
+
 /**
  * Print text to boot screen
  *
@@ -80,6 +83,10 @@ VOID BootPrint ( const char *fmt, ... ) {
 
 	/* Log to debugger, if attached */
 	DbgPrint ( "%s", buf );
+
+	/* Do nothing more unless boot text is enabled */
+	if ( ! boottext_enabled )
+		return;
 
 	/* Configure display */
 	if ( ! InbvCheckDisplayOwnership() )
