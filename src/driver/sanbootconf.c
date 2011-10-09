@@ -426,6 +426,7 @@ static NTSTATUS find_system_disk ( VOID ) {
 	}
 
 	/* Look for the system disk */
+	status = STATUS_NOT_FOUND;
 	for ( symlink = symlinks ;
 	      RtlInitUnicodeString ( &u_symlink, symlink ) , *symlink ;
 	      symlink += ( ( u_symlink.Length / sizeof ( *symlink ) ) + 1 ) ) {
