@@ -313,7 +313,13 @@ static NTSTATUS check_system_disk ( PUNICODE_STRING name,
 
 	/* Enable interface if not already done */
 	status = IoSetDeviceInterfaceState ( name, TRUE );
-	must_disable = ( NT_SUCCESS ( status ) ? TRUE : FALSE );
+	/* If interface is already enabled, IoSetDeviceInterfaceState
+	 * will return STATUS_OBJECT_NAME_EXISTS, which counts as a
+	 * success status.
+	 */
+	must_disable = ( ( NT_SUCCESS ( status ) &&
+			   ( status != STATUS_OBJECT_NAME_EXISTS ) )
+			 ? TRUE : FALSE );
 
 	/* Get device and file object pointers */
 	status = IoGetDeviceObjectPointer ( name, FILE_ALL_ACCESS, &file,
