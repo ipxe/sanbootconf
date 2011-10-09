@@ -20,6 +20,7 @@
 #include <initguid.h>
 #include <wdmsec.h>
 #include <ntdddisk.h>
+#include <coguid.h>
 #include "sanbootconf.h"
 #include "acpi.h"
 #include "ibft.h"
@@ -380,7 +381,10 @@ static NTSTATUS check_system_disk ( PUNICODE_STRING name,
 	if ( ! NT_SUCCESS ( status ) )
 		goto err_fetch_partition_info;
 
-	/* Check for a matching disk signature */
+	/* Check for a matching disk signature.  If no system disk is
+	 * defined (e.g. during text-mode setup), then treat any valid
+	 * disk as having a matching signature.
+	 */
 	status = STATUS_UNSUCCESSFUL;
 	switch ( info.PartitionStyle ) {
 	case PARTITION_STYLE_MBR:
@@ -388,7 +392,8 @@ static NTSTATUS check_system_disk ( PUNICODE_STRING name,
 			   info.Mbr.Signature, name );
 		if ( boot_info->SystemDeviceIsGpt )
 			goto err_not_system_disk;
-		if ( info.Mbr.Signature != boot_info->SystemDeviceSignature )
+		if ( ( boot_info->SystemDeviceSignature != 0 ) &&
+		     ( boot_info->SystemDeviceSignature != info.Mbr.Signature ))
 			goto err_not_system_disk;
 		break;
 	case PARTITION_STYLE_GPT:
@@ -396,8 +401,10 @@ static NTSTATUS check_system_disk ( PUNICODE_STRING name,
 			   GUID_ARGS ( info.Gpt.DiskId ), name );
 		if ( ! boot_info->SystemDeviceIsGpt )
 			goto err_not_system_disk;
-		if ( ! IsEqualGUID ( &info.Gpt.DiskId,
-				     &boot_info->SystemDeviceGuid ) )
+		if ( ( ! IsEqualGUID ( &boot_info->SystemDeviceGuid,
+				       &GUID_NULL ) ) &&
+		     ( ! IsEqualGUID ( &boot_info->SystemDeviceGuid,
+				       &info.Gpt.DiskId ) ) )
 			goto err_not_system_disk;
 		break;
 	default:
