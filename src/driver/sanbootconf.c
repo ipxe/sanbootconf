@@ -70,6 +70,50 @@ static const PWCHAR sanbootconf_device_symlink[] = {
 };
 
 /**
+ * Load system start options
+ *
+ * @ret ntstatus	NT status
+ */
+static NTSTATUS load_start_options ( VOID ) {
+	LPCWSTR key_name = ( L"\\Registry\\Machine\\SYSTEM\\"
+			     L"CurrentControlSet\\Control" );
+	LPWSTR options;
+	PWCHAR optchar;
+	HANDLE reg_key;
+	NTSTATUS status;
+	
+	/* Open Control key */
+	status = reg_open ( &reg_key, key_name, NULL );
+	if ( ! NT_SUCCESS ( status ) ) {
+		DbgPrint ( "Could not open Control key: %x\n", status );
+		goto err_reg_open;
+	}
+
+	/* Retrieve SystemStartOptions parameter */
+	status = reg_fetch_sz ( reg_key, L"SystemStartOptions", &options );
+	if ( ! NT_SUCCESS ( status ) ) {
+		DbgPrint ( "Could not read SystemStartOptions parameter: %x\n",
+			   status );
+		goto err_reg_fetch_sz;
+	}
+	DbgPrint ( "SystemStartOptions are %S\n", options );
+
+	/* Check for /NOGUIBOOT option */
+	for ( optchar = options ; *optchar ; optchar++ )
+		*optchar = towupper ( *optchar );
+	if ( wcsstr ( options, L"/NOGUIBOOT" ) != NULL )
+		guiboot_enabled = FALSE;
+	DbgPrint ( "Graphical boot is %s\n",
+		   ( guiboot_enabled ? "enabled" : "disabled" ) );
+
+	ExFreePool ( options );
+ err_reg_fetch_sz:
+	reg_close ( reg_key );
+ err_reg_open:
+	return status;
+}
+
+/**
  * Load driver parameters
  *
  * @v key_name		Driver key name
@@ -535,6 +579,15 @@ NTSTATUS DriverEntry ( IN PDRIVER_OBJECT DriverObject,
 	BOOLEAN found_san;
 
 	DbgPrint ( "SAN Boot Configuration Driver initialising\n" );
+
+	/* Load start options */
+	status = load_start_options();
+	if ( ! NT_SUCCESS ( status ) ) {
+		/* Treat as non-fatal error */
+		DbgPrint ( "Could not load system start options: %x\n",
+			   status );
+		status = STATUS_SUCCESS;
+	}
 
 	/* Load driver parameters */
 	status = load_parameters ( RegistryPath->Buffer );
