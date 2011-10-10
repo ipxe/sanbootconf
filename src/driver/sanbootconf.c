@@ -99,10 +99,10 @@ static NTSTATUS load_start_options ( VOID ) {
 	}
 	DbgPrint ( "SystemStartOptions are %S\n", options );
 
-	/* Check for /NOGUIBOOT option */
+	/* Check for NOGUIBOOT option */
 	for ( optchar = options ; *optchar ; optchar++ )
 		*optchar = towupper ( *optchar );
-	if ( wcsstr ( options, L"/NOGUIBOOT" ) != NULL )
+	if ( wcsstr ( options, L"NOGUIBOOT" ) != NULL )
 		guiboot_enabled = FALSE;
 	DbgPrint ( "Graphical boot is %s\n",
 		   ( guiboot_enabled ? "enabled" : "disabled" ) );

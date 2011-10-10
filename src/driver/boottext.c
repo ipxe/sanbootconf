@@ -62,7 +62,7 @@ VOID NTAPI InbvSolidColorFill ( IN ULONG Left, IN ULONG Top, IN ULONG Width,
 				IN ULONG Height, IN ULONG Color );
 VOID NTAPI InbvSetProgressBarSubset ( IN ULONG Floor, IN ULONG Ceiling );
 
-/** Graphical boot is enabled (i.e. /NOGUIBOOT switch is not present) */
+/** Graphical boot is enabled (i.e. NOGUIBOOT switch is not present) */
 BOOLEAN guiboot_enabled = TRUE;
 
 /** Boot text is enabled */
