@@ -19,6 +19,7 @@
 #pragma warning(disable:4100)  /* unreferenced formal parameter */
 
 #include <ntddk.h>
+#define NTSTRSAFE_LIB
 #include <ntstrsafe.h>
 #include "sanbootconf.h"
 #include "boottext.h"

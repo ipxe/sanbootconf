@@ -21,6 +21,7 @@
 
 #include <ntddk.h>
 #include <initguid.h>
+#define NTSTRSAFE_LIB
 #include <ntstrsafe.h>
 #include <ndis.h>
 #include <ndisguid.h>

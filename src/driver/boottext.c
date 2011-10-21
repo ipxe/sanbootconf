@@ -17,6 +17,7 @@
  */
 
 #include <ntddk.h>
+#define NTSTRSAFE_LIB
 #include <ntstrsafe.h>
 #include <stdarg.h>
 #include "sanbootconf.h"

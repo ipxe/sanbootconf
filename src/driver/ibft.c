@@ -20,6 +20,7 @@
 #pragma warning(disable:4327)  /* indirection alignment mismatch */
 
 #include <ntddk.h>
+#define NTSTRSAFE_LIB
 #include <ntstrsafe.h>
 #include "sanbootconf.h"
 #include "boottext.h"
