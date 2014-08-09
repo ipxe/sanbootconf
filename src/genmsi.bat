@@ -1,6 +1,6 @@
 @echo off
 
-if "%ddkdir%" == "" set ddkdir=C:\WinDDK\6001.18002
+if "%ddkdir%" == "" set ddkdir=C:\WinDDK\7600.16385.1
 set setenv=%ddkdir%\bin\setenv.bat %ddkdir%
 
 for /f "delims=" %%i in ('cd') do set cwd=%%i

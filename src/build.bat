@@ -1,14 +1,14 @@
 @echo off
 
-if "%ddkdir%" == "" set ddkdir=C:\WinDDK\6001.18002
+if "%ddkdir%" == "" set ddkdir=C:\WinDDK\7600.16385.1
 set setenv=%ddkdir%\bin\setenv.bat %ddkdir%
 
 for /f "delims=" %%i in ('cd') do set cwd=%%i
 
 rem Build code
 rem
-call :build driver chk w2k i386
-call :build installer chk w2k i386
+call :build driver chk wxp i386
+call :build installer chk wxp i386
 call :build driver chk wnet x64
 call :build installer chk wnet x64
 
