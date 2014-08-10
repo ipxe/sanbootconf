@@ -20,7 +20,7 @@ cmd /c "%setenv% && inf2cat /driver:%cwd%\..\bin /os:%oslist%" || exit /b 1
 rem Sign files
 rem
 set certname="Fen Systems Ltd."
-set xcertfile=%cwd%\certs\mscv_globalsign.cer
+set xcertfile=%cwd%\certs\mscv_verisign.cer
 cmd /c "%setenv% && certmgr -put -s my -c -n %certname% NUL >NUL" && goto havecert
 set certname="Test Certificate for sanbootconf"
 set certfile=%cwd%\certs\testcer.cer
