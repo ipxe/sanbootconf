@@ -90,5 +90,8 @@
       </Custom>
     </InstallExecuteSequence>
 
+    <Icon Id="sanbootconf.ico" SourceFile="sanbootconf.ico" />
+    <Property Id="ARPPRODUCTICON" Value="sanbootconf.ico" />
+
   </Product>
 </Wix>
