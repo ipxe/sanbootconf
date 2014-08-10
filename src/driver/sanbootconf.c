@@ -70,6 +70,15 @@ static const PWCHAR sanbootconf_device_symlink[] = {
 	L"\\DosDevices\\iSCSIBoot",
 };
 
+/* Forward declarations */
+static __drv_dispatchType ( IRP_MJ_CREATE )
+       __drv_dispatchType ( IRP_MJ_CLOSE )
+       __drv_dispatchType ( IRP_MJ_CLEANUP )
+       DRIVER_DISPATCH sanbootconf_dummy_irp;
+static __drv_dispatchType ( IRP_MJ_DEVICE_CONTROL )
+       DRIVER_DISPATCH sanbootconf_iocontrol_irp;
+DRIVER_INITIALIZE DriverEntry;
+
 /**
  * Load system start options
  *
