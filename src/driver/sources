@@ -6,6 +6,6 @@ TARGETPATH = ..\..\bin
 
 TARGETLIBS = $(DDK_LIB_PATH)\ndis.lib $(DDK_LIB_PATH)\ntstrsafe.lib $(DDK_LIB_PATH)\wdmsec.lib
 
-MSC_WARNING_LEVEL = /W4 /Wp64 /WX
+MSC_WARNING_LEVEL = /W4 /WX
 
 SOURCES = sanbootconf.c registry.c acpi.c nic.c ibft.c abft.c sbft.c boottext.c version.rc

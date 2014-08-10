@@ -9,7 +9,7 @@ TARGETLIBS = $(DDK_LIB_PATH)\setupapi.lib \
 
 USE_MSVCRT = 1
 
-MSC_WARNING_LEVEL = /W4 /Wp64 /WX
+MSC_WARNING_LEVEL = /W4 /WX
 
 UMTYPE = console
 
