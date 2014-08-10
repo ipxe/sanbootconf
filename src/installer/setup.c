@@ -494,8 +494,8 @@ int __cdecl main ( int argc, char **argv ) {
 		goto fail;
 	if ( file_part )
 		*file_part = 0;
-	_snprintf ( inf_rel_path, sizeof ( inf_rel_path ),
-		    "%s\\..\\sanbootconf.inf", bin_path );
+	_snprintf_s ( inf_rel_path, sizeof ( inf_rel_path ), _TRUNCATE,
+		      "%s\\..\\sanbootconf.inf", bin_path );
 	len = GetFullPathName ( inf_rel_path, array_size ( inf_path ),
 				inf_path, NULL );
 	if ( ( len == 0 ) || ( len >= array_size ( inf_path ) ) )
@@ -503,7 +503,8 @@ int __cdecl main ( int argc, char **argv ) {
 	printf ( "Installing from \"%s\"\n", inf_path );
 
 	/* Install/update driver */
-	_snwprintf ( inf_path_w, array_size ( inf_path_w ), L"%S", inf_path );
+	_snwprintf_s ( inf_path_w, array_size ( inf_path_w ), _TRUNCATE,
+		       L"%S", inf_path );
 	if ( install_or_update_driver ( inf_path_w, hw_id ) != 0 )
 		goto fail;
 

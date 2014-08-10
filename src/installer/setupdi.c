@@ -175,8 +175,8 @@ static int install_device_node ( LPWSTR inf_path, LPWSTR hw_id ) {
 	printf ( "Device instance ID is \"%S\"\n", dev_instance );
 
 	/* Add the hardware ID */
-	hw_ids_len = _snwprintf ( hw_ids, array_size ( hw_ids ),
-				  L"%s%c", hw_id, 0 );
+	hw_ids_len = _snwprintf_s ( hw_ids, array_size ( hw_ids ), _TRUNCATE,
+				    L"%s%c", hw_id, 0 );
 	if ( ! SetupDiSetDeviceRegistryPropertyW ( dev_info_list, &dev_info,
 						   SPDRP_HARDWAREID,
 						   ( ( LPBYTE ) hw_ids ),
