@@ -4,6 +4,7 @@ if "%ddkdir%" == "" set ddkdir=C:\WinDDK\7600.16385.1
 set setenv=%ddkdir%\bin\setenv.bat %ddkdir%
 
 for /f "delims=" %%i in ('cd') do set cwd=%%i
+set bindir=%cwd%\..\bin
 
 rem Build code
 rem
@@ -15,7 +16,7 @@ call :build installer chk wnet x64
 rem Create catalogue file
 rem
 set oslist=2000,XP_x86,XP_x64,Server2003_x86,Server2003_x64,Vista_x86,Vista_x64,Server2008_x86,Server2008_x64
-cmd /c "%setenv% && inf2cat /driver:%cwd%\..\bin /os:%oslist%" || exit /b 1
+cmd /c "%setenv% && inf2cat /driver:%bindir% /os:%oslist%" || exit /b 1
 
 rem Sign files
 rem
@@ -41,7 +42,8 @@ echo ***********************************************************************
 :havecert
 set timestamp=http://timestamp.verisign.com/scripts/timestamp.dll
 set desc="SAN Boot Configuration Driver"
-cmd /c "%setenv% && signtool sign -ac %xcertfile% -n %certname% -t %timestamp% -d %desc% -ph %cwd%\..\bin\i386\*.sys %cwd%\..\bin\amd64\*.sys %cwd%\..\bin\*.cat" || exit /b 1
+cmd /c "%setenv% && signtool sign -ac %xcertfile% -n %certname% -t %timestamp% -d %desc% -ph %bindir%\i386\sanbootconf.sys %bindir%\amd64\sanbootconf.sys %bindir%\sanbootconf.cat" || exit /b 1
+cmd /c "%setenv% && signtool verify -kp -tw -c %bindir%\sanbootconf.cat %bindir%\i386\sanbootconf.sys %bindir%\amd64\sanbootconf.sys" || exit /b 1
 set certparamfile=%cwd%\certs\params.bat
 echo set certname=%certname% > %certparamfile%
 echo set timestamp=%timestamp% >> %certparamfile%
