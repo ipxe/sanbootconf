@@ -41,7 +41,7 @@ echo ***********************************************************************
 :havecert
 set timestamp=http://timestamp.verisign.com/scripts/timestamp.dll
 set desc="SAN Boot Configuration Driver"
-cmd /c "%setenv% && signtool sign -ac %xcertfile% -n %certname% -t %timestamp% -d %desc% %cwd%\..\bin\i386\*.sys %cwd%\..\bin\amd64\*.sys %cwd%\..\bin\*.cat" || exit /b 1
+cmd /c "%setenv% && signtool sign -ac %xcertfile% -n %certname% -t %timestamp% -d %desc% -ph %cwd%\..\bin\i386\*.sys %cwd%\..\bin\amd64\*.sys %cwd%\..\bin\*.cat" || exit /b 1
 set certparamfile=%cwd%\certs\params.bat
 echo set certname=%certname% > %certparamfile%
 echo set timestamp=%timestamp% >> %certparamfile%
