@@ -430,6 +430,10 @@ static LONG fix_registry ( void ) {
 	if ( ( ( err = service_exists ( L"ibsrp" ) ) == ERROR_SUCCESS ) &&
 	     ( ( err = set_boot_start ( L"ibsrp" ) ) != ERROR_SUCCESS ) )
 		return err;
+	/* xenvif is present only when Xen PV drivers are installed */
+	if ( ( ( err = service_exists ( L"xenvif" ) ) == ERROR_SUCCESS ) &&
+	     ( ( err = set_boot_start ( L"xenvif" ) ) != ERROR_SUCCESS ) )
+		return err;
 	if ( ( err = set_boot_start_nics() ) != ERROR_SUCCESS )
 		return err;
 
