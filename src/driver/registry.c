@@ -38,6 +38,9 @@ NTSTATUS reg_open ( PHANDLE reg_key, ... ) {
 	SIZE_T key_name_len;
 	NTSTATUS status;
 
+	/* Avoid returning uninitialised data on error */
+	*reg_key = NULL;
+
 	/* Calculate total buffer length */
 	key_name_len = 0;
 	va_start ( args, reg_key );
@@ -93,6 +96,232 @@ VOID reg_close ( HANDLE reg_key ) {
 }
 
 /**
+ * Fetch registry key information
+ *
+ * @v reg_key		Registry key
+ * @v ki		Key information block to allocate and fill in
+ * @ret ntstatus	NT status
+ *
+ * The caller must eventually free the allocated key information
+ * block.
+ */
+NTSTATUS reg_fetch_ki ( HANDLE reg_key, PKEY_FULL_INFORMATION *ki ) {
+	ULONG ki_len;
+	NTSTATUS status;
+
+	/* Avoid returning uninitialised data on error */
+	*ki = NULL;
+
+	/* Get key information length */
+	status = ZwQueryKey ( reg_key, KeyFullInformation, NULL, 0, &ki_len );
+	if ( ! ( ( status == STATUS_SUCCESS ) ||
+		 ( status == STATUS_BUFFER_OVERFLOW ) ||
+		 ( status == STATUS_BUFFER_TOO_SMALL ) ) ) {
+		if ( status != STATUS_OBJECT_NAME_NOT_FOUND ) {
+			DbgPrint ( "Could not get KI length: %x\n", status );
+		}
+		goto err_zwquerykey_len;
+	}
+
+	/* Allocate key information buffer */
+	*ki = ExAllocatePoolWithTag ( NonPagedPool, ki_len,
+				      SANBOOTCONF_POOL_TAG );
+	if ( ! *ki ) {
+		DbgPrint ( "Could not allocate KI\n" );
+		status = STATUS_INSUFFICIENT_RESOURCES;
+		goto err_exallocatepoolwithtag_ki;
+	}
+
+	/* Fetch key information */
+	status = ZwQueryKey ( reg_key, KeyFullInformation, *ki, ki_len,
+			      &ki_len );
+	if ( ! NT_SUCCESS ( status ) ) {
+		DbgPrint ( "Could not get KI: %x\n", status );
+		goto err_zwquerykey;
+	}
+
+	return STATUS_SUCCESS;
+
+ err_zwquerykey:
+	ExFreePool ( *ki );
+ err_exallocatepoolwithtag_ki:
+ err_zwquerykey_len:
+	return status;
+}
+
+/**
+ * Fetch registry subkey count
+ *
+ * @v reg_key		Registry key
+ * @v subkeys		Subkey count to fill in
+ * @ret ntstatus	NT status
+ */
+NTSTATUS reg_fetch_subkeys ( HANDLE reg_key, ULONG *subkeys ) {
+	PKEY_FULL_INFORMATION ki;
+	NTSTATUS status;
+
+	/* Avoid returning uninitialised data on error */
+	*subkeys = 0;
+
+	/* Fetch key information */
+	status = reg_fetch_ki ( reg_key, &ki );
+	if ( ! NT_SUCCESS ( status ) )
+		goto err_reg_fetch_ki;
+
+	/* Extract subkey count */
+	*subkeys = ki->SubKeys;
+
+	ExFreePool ( ki );
+ err_reg_fetch_ki:
+	return status;
+}
+
+/**
+ * Fetch registry subkey information
+ *
+ * @v reg_key		Registry key
+ * @v index		Subkey index
+ * @v ki		Subkey information to fill in
+ * @ret ntstatus	NT status
+ *
+ * The caller must eventually free the allocated subkey name.
+ */
+NTSTATUS reg_fetch_subkey ( HANDLE reg_key, ULONG index,
+			    PKEY_BASIC_INFORMATION *ki ) {
+	ULONG ki_len;
+	NTSTATUS status;
+
+	/* Avoid returning uninitialised data on error */
+	*ki = NULL;
+
+	/* Fetch subkey information length */
+	status = ZwEnumerateKey ( reg_key, index, KeyBasicInformation, NULL, 0,
+				  &ki_len );
+	if ( ! ( ( status == STATUS_SUCCESS ) ||
+		 ( status == STATUS_BUFFER_OVERFLOW ) ||
+		 ( status == STATUS_BUFFER_TOO_SMALL ) ) ) {
+		DbgPrint ( "Could not get KI length for subkey %d: %x\n",
+			   index, status );
+		goto err_zwenumeratekey_len;
+	}
+
+	/* Allocate subkey information buffer */
+	*ki = ExAllocatePoolWithTag ( NonPagedPool, ki_len,
+				      SANBOOTCONF_POOL_TAG );
+	if ( ! *ki ) {
+		DbgPrint ( "Could not allocate KI for subkey %d\n", index );
+		status = STATUS_INSUFFICIENT_RESOURCES;
+		goto err_exallocatepoolwithtag_ki;
+	}
+
+	/* Fetch subkey information */
+	status = ZwEnumerateKey ( reg_key, index, KeyBasicInformation, *ki,
+				  ki_len, &ki_len );
+	if ( ! NT_SUCCESS ( status ) ) {
+		DbgPrint ( "Could not get KI for subkey %d: %x\n",
+			   index, status );
+		goto err_zwenumeratekey;
+	}
+
+	return STATUS_SUCCESS;
+
+ err_zwenumeratekey:
+	ExFreePool ( *ki );
+ err_exallocatepoolwithtag_ki:
+ err_zwenumeratekey_len:
+	return status;
+}
+
+/**
+ * Fetch subkey name
+ *
+ * @v reg_key		Registry key
+ * @v index		Subkey index
+ * @v name		Subkey name to fill in
+ * @ret ntstatus	NT status
+ *
+ * The caller must eventually free the allocated subkey name.
+ */
+NTSTATUS reg_fetch_subkey_name ( HANDLE reg_key, ULONG index, LPWSTR *name ) {
+	PKEY_BASIC_INFORMATION ki;
+	ULONG name_len;
+	NTSTATUS status;
+
+	/* Avoid returning uninitialised data on error */
+	*name = NULL;
+
+	/* Fetch subkey information */
+	status = reg_fetch_subkey ( reg_key, index, &ki );
+	if ( ! NT_SUCCESS ( status ) )
+		goto err_reg_fetch_subkey;
+
+	/* Allocate and populate string */
+	name_len = ( ki->NameLength + sizeof ( name[0] ) );
+	*name = ExAllocatePoolWithTag ( NonPagedPool, name_len,
+					SANBOOTCONF_POOL_TAG );
+	if ( ! *name ) {
+		DbgPrint ( "Could not allocate name for subkey %d\n", index );
+		status = STATUS_INSUFFICIENT_RESOURCES;
+		goto err_exallocatepoolwithtag_name;
+	}
+	RtlZeroMemory ( *name, name_len );
+	RtlCopyMemory ( *name, ki->Name, ki->NameLength );
+
+ err_exallocatepoolwithtag_name:
+	ExFreePool ( ki );
+ err_reg_fetch_subkey:
+	return status;
+}
+
+/**
+ * Enumerate subkeys
+ *
+ * @v reg_key		Registry key
+ * @v callback		Callback function for each subkey name
+ * @v opaque		Opaque parameter for callback function
+ * @ret ntstatus	NT status
+ */
+NTSTATUS reg_enum_subkeys ( HANDLE reg_key,
+			    NTSTATUS ( * callback ) ( VOID *opaque,
+						      LPCWSTR name ),
+			    VOID *opaque ) {
+	ULONG subkeys;
+	ULONG index;
+	LPWSTR name = NULL;
+	NTSTATUS status;
+
+	/* Get subkey count */
+	status = reg_fetch_subkeys ( reg_key, &subkeys );
+	if ( ! NT_SUCCESS ( status ) )
+		goto err_reg_fetch_subkeys;
+
+	/* Enumerate subkeys */
+	for ( index = 0 ; index < subkeys ; index++ ) {
+
+		/* Get subkey name */
+		status = reg_fetch_subkey_name ( reg_key, index, &name );
+		if ( ! NT_SUCCESS ( status ) )
+			goto err_reg_fetch_subkey_name;
+
+		/* Process subkey */
+		status = callback ( opaque, name );
+		if ( ! NT_SUCCESS ( status ) )
+			goto err_callback;
+
+		/* Free subkey name */
+		ExFreePool ( name );
+		name = NULL;
+	}
+
+ err_callback:
+	if ( name )
+		ExFreePool ( name );
+ err_reg_fetch_subkey_name:
+ err_reg_fetch_subkeys:
+	return status;
+}
+
+/**
  * Fetch registry key value information
  *
  * @v reg_key		Registry key
@@ -109,7 +338,10 @@ NTSTATUS reg_fetch_kvi ( HANDLE reg_key, LPCWSTR value_name,
 	ULONG kvi_len;
 	NTSTATUS status;
 
-	/* Get value length */
+	/* Avoid returning uninitialised data on error */
+	*kvi = NULL;
+
+	/* Get key value information length */
 	RtlInitUnicodeString ( &u_value_name, value_name );
 	status = ZwQueryValueKey ( reg_key, &u_value_name,
 				   KeyValuePartialInformation, NULL, 0,
@@ -117,21 +349,23 @@ NTSTATUS reg_fetch_kvi ( HANDLE reg_key, LPCWSTR value_name,
 	if ( ! ( ( status == STATUS_SUCCESS ) ||
 		 ( status == STATUS_BUFFER_OVERFLOW ) ||
 		 ( status == STATUS_BUFFER_TOO_SMALL ) ) ) {
-		DbgPrint ( "Could not get KVI length for \"%S\": %x\n",
-			   value_name, status );
+		if ( status != STATUS_OBJECT_NAME_NOT_FOUND ) {
+			DbgPrint ( "Could not get KVI length for \"%S\": %x\n",
+				   value_name, status );
+		}
 		goto err_zwqueryvaluekey_len;
 	}
 
-	/* Allocate value buffer */
+	/* Allocate key value information buffer */
 	*kvi = ExAllocatePoolWithTag ( NonPagedPool, kvi_len,
 				       SANBOOTCONF_POOL_TAG );
 	if ( ! *kvi ) {
-		DbgPrint ( "Could not allocate KVI for \"%S\": %x\n",
-			   value_name, status );
+		DbgPrint ( "Could not allocate KVI for \"%S\"\n", value_name );
+		status = STATUS_INSUFFICIENT_RESOURCES;
 		goto err_exallocatepoolwithtag_kvi;
 	}
 
-	/* Fetch value */
+	/* Fetch key value information */
 	status = ZwQueryValueKey ( reg_key, &u_value_name,
 				   KeyValuePartialInformation, *kvi,
 				   kvi_len, &kvi_len );
@@ -165,6 +399,9 @@ NTSTATUS reg_fetch_sz ( HANDLE reg_key, LPCWSTR value_name, LPWSTR *value ) {
 	ULONG value_len;
 	NTSTATUS status;
 
+	/* Avoid returning uninitialised data on error */
+	*value = NULL;
+
 	/* Fetch key value information */
 	status = reg_fetch_kvi ( reg_key, value_name, &kvi );
 	if ( ! NT_SUCCESS ( status ) )
@@ -177,7 +414,7 @@ NTSTATUS reg_fetch_sz ( HANDLE reg_key, LPCWSTR value_name, LPWSTR *value ) {
 	if ( ! *value ) {
 		DbgPrint ( "Could not allocate value for \"%S\"\n",
 			   value_name );
-		status = STATUS_UNSUCCESSFUL;
+		status = STATUS_INSUFFICIENT_RESOURCES;
 		goto err_exallocatepoolwithtag_value;
 	}
 	RtlZeroMemory ( *value, value_len );
@@ -208,6 +445,9 @@ NTSTATUS reg_fetch_multi_sz ( HANDLE reg_key, LPCWSTR value_name,
 	ULONG i;
 	NTSTATUS status;
 
+	/* Avoid returning uninitialised data on error */
+	*values = NULL;
+
 	/* Fetch key value information */
 	status = reg_fetch_kvi ( reg_key, value_name, &kvi );
 	if ( ! NT_SUCCESS ( status ) )
@@ -232,7 +472,7 @@ NTSTATUS reg_fetch_multi_sz ( HANDLE reg_key, LPCWSTR value_name,
 	if ( ! *values ) {
 		DbgPrint ( "Could not allocate value array for \"%S\"\n",
 			   value_name );
-		status = STATUS_UNSUCCESSFUL;
+		status = STATUS_INSUFFICIENT_RESOURCES;
 		goto err_exallocatepoolwithtag_value;
 	}
 	RtlZeroMemory ( *values, values_len );
@@ -263,6 +503,9 @@ NTSTATUS reg_fetch_multi_sz ( HANDLE reg_key, LPCWSTR value_name,
 NTSTATUS reg_fetch_dword ( HANDLE reg_key, LPCWSTR value_name, ULONG *value ) {
 	PKEY_VALUE_PARTIAL_INFORMATION kvi;
 	NTSTATUS status;
+
+	/* Avoid returning uninitialised data on error */
+	*value = 0;
 
 	/* Fetch key value information */
 	status = reg_fetch_kvi ( reg_key, value_name, &kvi );

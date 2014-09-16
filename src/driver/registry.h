@@ -21,6 +21,16 @@
 
 extern NTSTATUS reg_open ( PHANDLE reg_key, ... );
 extern VOID reg_close ( HANDLE reg_key );
+extern NTSTATUS reg_fetch_ki ( HANDLE reg_key, PKEY_FULL_INFORMATION *ki );
+extern NTSTATUS reg_fetch_subkeys ( HANDLE reg_key, ULONG *subkeys );
+extern NTSTATUS reg_fetch_subkey ( HANDLE reg_key, ULONG index,
+				   PKEY_BASIC_INFORMATION *ki );
+extern NTSTATUS reg_fetch_subkey_name ( HANDLE reg_key, ULONG index,
+					LPWSTR *name );
+extern NTSTATUS reg_enum_subkeys ( HANDLE reg_key,
+				   NTSTATUS ( * callback ) ( VOID *opaque,
+							     LPCWSTR name ),
+				   VOID *opaque );
 extern NTSTATUS reg_fetch_kvi ( HANDLE reg_key, LPCWSTR value_name,
 				PKEY_VALUE_PARTIAL_INFORMATION *kvi );
 extern NTSTATUS reg_fetch_sz ( HANDLE reg_key, LPCWSTR value_name,
